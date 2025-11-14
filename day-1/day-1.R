@@ -241,7 +241,8 @@ expand_grid(imprecision = c(0, 5),
 #' biologically irrelevant effects can be statistically significant
 #' e.g., as our sample size tends to infinity, the p-value will tend to 0
 
-#' Q: what is P(mu = mu_0)?
+#' Q: what is `P(mu = mu_0)`?
+
 #' Q: how does this affect your interpretation of hypothesis testing?
 
 #' *dealing with missing data*
@@ -252,6 +253,39 @@ expand_grid(imprecision = c(0, 5),
 #' in a Bayesian framework, priors can be used to fill in missing data:
 #' - added data have measures of uncertainty
 #' - added data affect results proportionally to uncertainty
+set.seed(95)
+d_ts <- tibble(time = 1:100,
+               y = rnorm(length(time))) %>%
+  mutate(y = cumsum(y),
+         y = y + min(y) + 10)
+
+ggplot(d_ts) +
+  geom_line(aes(time, y), alpha = 0.3) +
+  geom_point(aes(time, y))
+
+# Q: how would you perform data imputation on this time series?
+d_ts %>%
+  filter(time < 50 | time > 70) %>%
+  ggplot() +
+  geom_line(aes(time, y), alpha = 0.3) +
+  geom_point(aes(time, y))
+
+# data interpolation gets increasingly problematic as gaps get bigger
+d_ts %>%
+  filter(time < 40 | time > 80) %>%
+  ggplot() +
+  geom_line(aes(time, y), alpha = 0.3) +
+  geom_point(aes(time, y))
+
+# spoiler: GAMs smooth over gaps efficiently
+d_ts %>%
+  filter(time < 40 | time > 80) %>%
+  ggplot(aes(time, y)) +
+  geom_smooth(method = 'gam', color = 'darkorange', fill = 'darkorange',
+              alpha = 0.3, lwd = 1, n = 1e3) +
+  geom_point(aes(time, y))
+
+#' *if review topics are still unclear, review them before next week*
 
 # part 2: introduction to (linear) trend detection (ANOVA, ANCOVA) ----
 d_1 <- gamSim(eg = 5, n = 100) %>% as_tibble()
@@ -414,3 +448,5 @@ plot_grid(draw(gam(co2_ppm ~ poly(season, 1), data = d_co2),
                parametric = TRUE, data = new_d_season),
           draw(gam(co2_ppm ~ poly(season, 9), data = d_co2),
                parametric = TRUE, data = new_d_season))
+
+#' *need to add extra material*
