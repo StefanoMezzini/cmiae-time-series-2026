@@ -1,5 +1,7 @@
-# day 1 -- Jan 27
-# before we start...
+#' day 1: 2026-01-27
+#' before we start...
+#' run `necessary-packages.R` to install all the packages we'll use
+#' 
 #' Q: how many have *not* used `R` much before?
 #' Q: how many have *not* used functional programming (e.g., `apply()`)?
 #' Q: how many are *not* used to `tidyverse` syntax (`%>%`, etc.)?
@@ -287,6 +289,10 @@ d_ts %>%
 
 #' *if review topics are still unclear, review them before next week*
 
+#' ***break**
+
+#' ========================================================================
+
 # part 2: introduction to (linear) trend detection (ANOVA, ANCOVA) ----
 d_1 <- gamSim(eg = 5, n = 100) %>% as_tibble()
 
@@ -357,7 +363,8 @@ p_preds_1 +
 
 # Q: what kinds of signals can you detect with linear models?
 
-#' `co2` is a time series object, so convert it into a data frame
+#' `co2` (lowercase): a time series object, so convert it into a data frame
+?co2
 d_co2 <- tibble(dec_date = as.vector(time(co2)),
                 year = floor(dec_date),
                 season = dec_date - year,
@@ -366,15 +373,20 @@ d_co2
 
 lm_co2 <- gam(co2_ppm ~ dec_date, family = gaussian(), data = d_co2)
 
-p_preds_2 <-
+p_preds_co2 <-
   ggplot() +
   geom_point(aes(dec_date, co2_ppm), d_co2, alpha = 0.5) +
   geom_ribbon(aes(dec_date, ymin = .lower_ci, ymax = .upper_ci),
               fitted_values(lm_co2), fill = 'darkorange', alpha = 0.3) +
   geom_line(aes(dec_date, .fitted), fitted_values(lm_co2),
             color = 'darkorange', linewidth = 1)
+p_preds_co2
 
 # Q: would you answers to the three questions above change?
+
+# Q: when would you say co2 increased significantly?
+
+# Q: how would you detect a change in the slope?
 
 #' *limitations of linear models*
 appraise(lm_co2) # see nonlinear trends in residuals vs linear predictors
@@ -405,11 +417,26 @@ fitted_values(lm_co2_poly, data = d_co2) %>%
 #' the effect of `dec_date` depends on `dec_date`: `dec_date` has more of
 #' and effect as `dec_date` increases
 
-lm_co2_full <- gam(co2_ppm ~
-                     poly(year, 2) + # long-term trend
-                     poly(season, 4) + # seasonal trend
-                     season:year, # change in seasnoal trend over the years
-                   family = gaussian(), data = d_co2)
+# we could also add a polynomial term of season
+d_co2 %>%
+  mutate(co2_ppm = co2_ppm - mean(co2_ppm), .by = 'year') %>%
+  ggplot() +
+  geom_line(aes(season, co2_ppm, group = year), alpha = 0.5)
+
+# fit the full model
+lm_co2_full <-
+  gam(co2_ppm ~
+        poly(year, 2) + # long-term trend
+        poly(season, 4) + # seasonal trend
+        poly(season, 3):poly(year, 2),# change in seasonal trend over years
+      family = gaussian(), data = d_co2)
+
+lm_co2_full <-
+  gam(co2_ppm ~ s(year) + s(season, bs = 'cc') +
+        ti(season, year, k = 5, bs = c('cc', 'cr')),
+      family = gaussian(), data = d_co2, knots = list(season = c(0, 1)),
+      method = 'REML')
+
 
 draw(lm_co2_full, parametric = TRUE)
 
@@ -421,7 +448,7 @@ fitted_values(object = lm_co2_full, data = d_co2) %>%
   geom_line(aes(dec_date, .fitted), color = 'darkorange', linewidth = 1)
 
 draw(lm_co2_full, parametric = TRUE,
-     data = tibble(year = 1960:1997,
+     data = tibble(year = 1959:1997,
                    season = seq(0, 1, length.out = length(year))))
 
 # many textbooks suggest performing model selection using p-values or AIC
@@ -449,4 +476,33 @@ plot_grid(draw(gam(co2_ppm ~ poly(season, 1), data = d_co2),
           draw(gam(co2_ppm ~ poly(season, 9), data = d_co2),
                parametric = TRUE, data = new_d_season))
 
-#' *need to add extra material*
+#' *extra questions*
+#' Q: how do you relate the concept of a population with time series?
+#' Q: how many samples do you need to estimate a trend?
+#' Q: how many samples do you need to estimate a significant trend?
+
+#' *extra work for those interested*
+#' Q: how would you model the datasets below?
+#' Q: how does using linear models restrict you?
+#' Q: what would you do to overcome the limitations of linear models?
+
+#' `CO2` (all uppercase; see `?CO2` for more info)
+?CO2
+
+CO2 <- janitor::clean_names(CO2) # use  tidyverse syntax for names
+
+ggplot(CO2, aes(conc, uptake, group = plant)) +
+  facet_grid(treatment ~ type) +
+  geom_line() +
+  geom_point(alpha = 0.3)
+
+#' `ouf_sim`: sample date along with concentrations of two compounds
+ouf_sim <- readr::read_csv('data/ouf-sim.csv', col_types = 'Ddd')
+
+ouf_sim %>%
+  pivot_longer(! date) %>%
+  ggplot(aes(date, value)) +
+  facet_wrap(~ name, scale = 'free_y') +
+  geom_line() +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method ='lm', color = 'darkorange', fill = 'darkorange')
