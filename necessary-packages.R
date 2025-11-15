@@ -1,1 +1,1 @@
-install.packages(c('tidyverse', 'mgcv', 'gratia', 'cowplot'))
+install.packages(c('tidyverse', 'mgcv', 'gratia', 'cowplot', 'janitor'))
