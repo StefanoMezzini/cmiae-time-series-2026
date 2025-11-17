@@ -6,7 +6,7 @@
 
 ?CO2
 
-CO2 <- janitor::clean_names(CO2) # use  tidyverse syntax for names
+CO2 <- janitor::clean_names(CO2) # use tidyverse syntax for names
 
 #' modeling the `CO2` dataset...
 #' ... with linear models

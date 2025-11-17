@@ -546,7 +546,7 @@ plot_grid(draw(gam(co2_ppm ~ poly(season, 1), data = d_co2),
 #' dataset on CO2 uptake by plants (Cockspur grass; Echinochloa crus-galli)
 ?CO2
 
-CO2 <- janitor::clean_names(CO2) # use  tidyverse syntax for names
+CO2 <- janitor::clean_names(CO2) # use tidyverse syntax for names
 
 ggplot(CO2, aes(conc, uptake, group = plant)) +
   facet_grid(treatment ~ type) +
