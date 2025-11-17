@@ -538,9 +538,18 @@ plot_grid(draw(gam(co2_ppm ~ poly(season, 1), data = d_co2),
 #' Q: how many samples do you need to estimate a significant trend?
 
 #' *extra work for those interested*
-#' Q: how would you model the two datasets below?
+#' Q: how would you model the three datasets below?
 #' Q: how does using linear models restrict you?
 #' Q: what would you do to overcome the models' limitations?
+
+#' `ChickWeight`: weight of chicks over time (0-21) eating 4 diets
+ChickWeight <- janitor::clean_names(ChickWeight) %>% as_tibble()
+ChickWeight
+
+ggplot(ChickWeight, aes(time, weight, group = chick)) +
+  facet_wrap(~ diet) +
+  geom_line(alpha = 0.5) +
+  geom_point(alpha = 0.3)
 
 #' `CO2` (all uppercase; see `?CO2` for more info)
 #' dataset on CO2 uptake by plants (Cockspur grass; Echinochloa crus-galli)
