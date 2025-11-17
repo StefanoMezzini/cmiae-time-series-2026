@@ -20,7 +20,7 @@ theme_set(theme_bw())
 
 # part 1: review of core statistical concepts ----
 #' *populations*
-#' imagine all individuals of species "X" that ever existed and ever will.
+#' imagine all individuals of species "X" within a given period of time.
 #' let the population of all masses have a mean `mu` and variance `sigma`:
 mu <- 14.5 # true mean
 sigma <- 2.2 # true standard deviation
@@ -72,12 +72,15 @@ sample_summaries <- samples %>%
             sample_var = sample_sd^2)
 
 # sample means and SDs differ across samples
-p_samples +
+p_sds <-
+  p_samples +
   geom_rect(aes(xmin = sample_mean - sample_sd, ymin = 0,
                 xmax = sample_mean + sample_sd, ymax = Inf),
             sample_summaries, lty = 'dotted', fill = 'red', alpha = 0.2) +
   geom_vline(aes(xintercept = sample_mean), sample_summaries,
-             color = 'red', lty = 'dashed')
+             color = 'red', lty = 'dashed') +
+  ggtitle('Samples with sample mean \U00B1 1 SD')
+p_sds
 
 #' *estimates and sampling distributions*
 # sample statistics are estimates of the population statistics:
@@ -103,7 +106,7 @@ ggplot(sample_summaries) +
 ggplot(sample_summaries) +
   geom_histogram(aes(sample_var), binwidth = 0.75, color = 'black',
                  fill = 'grey') +
-  labs(x = expression('Sample variances,'~sigma^2~(kg^2)),
+  labs(x = expression('Sample variances,'~widehat(sigma^2)~(kg^2)),
        y = 'Count')
 
 #' *uncertainty (standard deviation, variance, standard error)*
@@ -151,14 +154,18 @@ sample_summaries <-
          upper_ci = sample_mean + qt(1 - 0.05 / 2, 11 - 1) * sample_se)
 
 # histograms of the data with 95% CIs
-p_samples +
+p_cis <-
+  p_samples +
   geom_rect(aes(xmin = lower_ci, ymin = 0,
                 xmax = upper_ci, ymax = Inf),
             sample_summaries, lty = 'dotted', fill = 'red', alpha = 0.2) +
   geom_vline(aes(xintercept = sample_mean), sample_summaries,
-             color = 'red', lty = 'dashed')
+             color = 'red', lty = 'dashed') +
+  ggtitle('Samples with sample mean and 95% CI')
+p_cis
 
-# Q: how does this figure differ from the one on line 69?
+#' Q: how does this figure differ from `p_sds`?
+plot_grid(p_sds, p_cis, ncol = 1)
 
 #' *p-values*
 #' indicate the probability of obtaining this dataset or a more extreme one
@@ -307,15 +314,36 @@ plot(lm_1, all.terms = TRUE) # explicitly tell it to include linear terms
 draw(lm_1) #' fails like `plot()`
 draw(lm_1, parametric = TRUE)
 
+#' *NOTE:* when `x1 = 0`, `y = 0`, and CIs are zero-width
+
 # extract model coefficients
 coef(lm_1)
 #' `(Intercept)` is the *y intercept*: the value of `y` when `x1` is 0
 #' `x1` is the *slope*: the change in `y` when `x1` increases by 1
 
-#' check if `y` changes significantly with `x`, given some alpha value
+#' Q: did `mu` (not `y`) change significantly?
+#' check the significance table to see, given some alpha value
 summary(lm_1)
 
+#' `Family: gaussian`: `y` is assumed to be *conditionally* Gaussian
+#' `Formula`: model formula
+#' `Parametric coefficients`: table for intercept & slope coefs containing:
+#'    - estimates
+#'    - standard errors
+#'    - t values (sometimes zz values if variance = mean)
+#'    - p values
+#' `R-sq. (adj.)`: adjusted R^2
+#' `Deviance explained`: percentage of deviance explained by the model
+#' `GCV`: score from Generalized Cross Validation
+#' `Scale est`: scale parameter (close to `var(resid(lm_1))`)
+#' `n`: sample size 
+
 #' *predicting with LMs*
+head(predict(lm_1)) # returns predicted means
+predict(lm_1, newdata = tibble(x1 = c(1, 3))) # can predict for other data
+predict(lm_1, se.fit = TRUE, newdata = head(d_1)) # can include SE
+
+#' `gratia::fitted_values()` returns predictions with SE and CIs
 preds_1 <- tibble(x1 = seq(0, 1, length.out = 400)) %>%
   fitted_values(object = lm_1, # our model
                 data = ., # the data from the line above
@@ -332,21 +360,23 @@ p_preds_1
 # intercept
 p_preds_1 +
   geom_point(aes(0, coef(lm_1)['(Intercept)']), color = 'dodgerblue3',
-             size = 3)
+             size = 3) +
+  geom_hline(yintercept = coef(lm_1)['(Intercept)'], color = 'dodgerblue3',
+             lty = 'dashed')
 
 # slope
 p_preds_1 +
   geom_polygon(aes(x1, y),
                tibble(x1 = c(0, 1, 1),
                       y = c(0, coef(lm_1)[2], 0) + coef(lm_1)[1]),
-               color = 'dodgerblue4', fill = 'dodgerblue4', alpha = 0.2,)
+               color = 'dodgerblue3', fill = 'dodgerblue3', alpha = 0.2,)
 
 # check if change is significant: does the CI include the horizontal line?
 p_preds_1 +
   geom_hline(yintercept = predict(lm_1, newdata = tibble(x1 = 0.5)),
              lty = 'dashed')
 
-#' easier to see with `draw()`:
+#' easier to see with `draw()` or `plot()`:
 draw(lm_1, parametric = TRUE) &
   geom_hline(yintercept = 0, lty = 'dashed')
 
@@ -355,13 +385,13 @@ draw(lm_1, parametric = TRUE) &
 #' error in data: the noise in the data around the signal(s)
 #' model error: the difference between the truth and the model
 p_preds_1 +
-  geom_smooth(aes(x1, y), d_1, alpha = 0.1)
+  geom_smooth(aes(x1, y), d_1, alpha = 0.3)
 
 # Q: how do you decide what counts as signal vs error?
 
-# Q: how do you distinguish between errors in the data vs in the model?
+# Q: how to distinguish randomness/errors in the data from in the model?
 
-# Q: what kinds of signals can you detect with linear models?
+# Q: what kinds of trends can you detect with linear models?
 
 #' `co2` (lowercase): a time series object, so convert it into a data frame
 ?co2
@@ -391,16 +421,16 @@ p_preds_co2
 #' *limitations of linear models*
 appraise(lm_co2) # see nonlinear trends in residuals vs linear predictors
 
-#' *polynomial models*
-# collinearity can be a common issue
+#' *polynomial models* can estimate some "nonlinear" trents
+#' *NOTE:* still actually linear because the models are sums of products:
+#'  `mu = b0 + b1 * x1 + b2 * (x1)^2 = b0 + b1 * x1 + b2 * x2`
 lm_co2_poly <- gam(formula = co2_ppm ~ poly(dec_date, 2),
                    family = gaussian(), data = d_co2)
 
-# lm_co2_poly <- gam(formula = co2_ppm ~ dec_date + dec_date2,
-#                    family = gaussian(), data = d_co2)
 draw(lm_co2_poly, parametric = TRUE)
 
-#' model is still a straight line: `dec_date` and `dec_date2` are collinear
+#' model now assumes a parabolic increase
+#' still can't tell when change started: coefs apply for all values of `x1`
 fitted_values(lm_co2_poly, data = d_co2) %>%
   ggplot() +
   geom_point(aes(dec_date, co2_ppm), d_co2, alpha = 0.5) +
@@ -413,9 +443,10 @@ fitted_values(lm_co2_poly, data = d_co2) %>%
 #' - `(Intercept)`: `co2_ppm` when `dec_date` is zero
 #' - `dec_date` coef: increase in `co2_ppm` in a year
 #' - `dec_date^2` coef: change in the coef of `dec_date` with `dec_date`
+#'                      `dec_date^2 = dec_date * dec_date`
 #' 
 #' the effect of `dec_date` depends on `dec_date`: `dec_date` has more of
-#' and effect as `dec_date` increases
+#' an effect as `dec_date` increases
 
 # we could also add a polynomial term of season
 d_co2 %>%
@@ -423,36 +454,61 @@ d_co2 %>%
   ggplot() +
   geom_line(aes(season, co2_ppm, group = year), alpha = 0.5)
 
-# fit the full model
-lm_co2_full <-
+# fit a model with season and interaction terms
+lm_co2_int_1 <-
   gam(co2_ppm ~
         poly(year, 2) + # long-term trend
         poly(season, 4) + # seasonal trend
         poly(season, 3):poly(year, 2),# change in seasonal trend over years
       family = gaussian(), data = d_co2)
 
-lm_co2_full <-
-  gam(co2_ppm ~ s(year) + s(season, bs = 'cc') +
-        ti(season, year, k = 5, bs = c('cc', 'cr')),
-      family = gaussian(), data = d_co2, knots = list(season = c(0, 1)),
-      method = 'REML')
+draw(lm_co2_int_1, parametric = TRUE) # plots with original data values
+draw(lm_co2_int_1, parametric = TRUE, rug = FALSE,
+     data = tibble(year = seq(1959, 1997, length.out = 400),
+                   season = seq(0, 0.9166667, length.out = 400)))
 
+p_int_1 <-
+  fitted_values(object = lm_co2_int_1, data = d_co2) %>%
+  ggplot() +
+  geom_point(aes(dec_date, co2_ppm), d_co2, alpha = 0.5) +
+  geom_ribbon(aes(dec_date, ymin = .lower_ci, ymax = .upper_ci),
+              fill = 'darkorange', alpha = 0.3) +
+  geom_line(aes(dec_date, .fitted), color = 'darkorange', linewidth = 1)
+p_int_1
 
-draw(lm_co2_full, parametric = TRUE)
+draw(lm_co2_int_1, parametric = TRUE,
+     data = tibble(year = 1959:1997,
+                   season = seq(0, 1, length.out = length(year))))
 
-fitted_values(object = lm_co2_full, data = d_co2) %>%
+# 
+lm_co2_int_2 <-
+  gam(co2_ppm ~
+        poly(year, 4) + # long-term trend
+        poly(season, 4) + # seasonal trend
+        poly(season, 4):poly(year, 4),# change in seasonal trend over years
+      family = gaussian(), data = d_co2)
+
+fitted_values(object = lm_co2_int_2, data = d_co2) %>%
   ggplot() +
   geom_point(aes(dec_date, co2_ppm), d_co2, alpha = 0.5) +
   geom_ribbon(aes(dec_date, ymin = .lower_ci, ymax = .upper_ci),
               fill = 'darkorange', alpha = 0.3) +
   geom_line(aes(dec_date, .fitted), color = 'darkorange', linewidth = 1)
 
-draw(lm_co2_full, parametric = TRUE,
-     data = tibble(year = 1959:1997,
-                   season = seq(0, 1, length.out = length(year))))
-
 # many textbooks suggest performing model selection using p-values or AIC
-summary(lm_co2_full)
+AIC(lm_co2_poly,  # no season or interaction terms
+    lm_co2_int_1, # with season and interaction terms
+    lm_co2_int_2) # with more complex year and interaction terms
+
+summary(lm_co2_int_2) # interaction may be unnecessary?
+
+lm_co2_seas <- gam(co2_ppm ~ poly(year, 4) + poly(season, 4),
+                   family = gaussian(), data = d_co2)
+
+AIC(lm_co2_poly,  # no season or interaction terms
+    lm_co2_int_1, # with season and interaction terms
+    lm_co2_int_2, # with more complex year and interaction terms
+    lm_co2_seas)  # with high flexibility but without interaction term
 
 # how do we choose the complexity of the polynomial terms?
 new_d_season <- tibble(season = seq(0, 1, length.out = 400))
@@ -482,11 +538,12 @@ plot_grid(draw(gam(co2_ppm ~ poly(season, 1), data = d_co2),
 #' Q: how many samples do you need to estimate a significant trend?
 
 #' *extra work for those interested*
-#' Q: how would you model the datasets below?
+#' Q: how would you model the two datasets below?
 #' Q: how does using linear models restrict you?
-#' Q: what would you do to overcome the limitations of linear models?
+#' Q: what would you do to overcome the models' limitations?
 
 #' `CO2` (all uppercase; see `?CO2` for more info)
+#' dataset on CO2 uptake by plants (Cockspur grass; Echinochloa crus-galli)
 ?CO2
 
 CO2 <- janitor::clean_names(CO2) # use  tidyverse syntax for names
