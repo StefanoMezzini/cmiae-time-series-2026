@@ -108,7 +108,7 @@ ggExtra::ggMarginal(
 #' `betar`: ratio data (bounded [0, 1]); can also be used for NDVI
 
 #' `ocat`: ordered categorical data (e.g., small < medium < big)
-#' `scat`: scaled t data (unbounded, like gaussian, but thicker tails)
+#' `scat`: scaled t data (unbounded, like Gaussian, but thicker tails)
 #' `ziP`: zero-inflated count data (e.g., counts with many zeros)
 #' `cox.ph`: cox proportional hazards (survival analysis)
 #' `multinom`: unordered categorical data (e.g., colors)
@@ -118,7 +118,7 @@ ggExtra::ggMarginal(
 #' *multiple linear predictors (a list of formulae; require lots of data)*
 #' *location-scale are for trends in the mean-variance relationship*
 #' `mvn`: multivariate normal data (separate variances with a v-cov matrix)
-#' `gaulss`: location-scale gaussian, unbounded data
+#' `gaulss`: location-scale Gaussian, unbounded data
 #' `gammals`: location-scale gamma
 #' `ziplss`: location-scale zero-inflated poisson
 #' `twlss`: location-scale tweedie
@@ -189,7 +189,7 @@ appraise(m_glm, method = 'simulate', n_simulate = 100, point_alpha = 0.3)
 plot_preds(m_glm) # look at plot again carefully
 
 #' *check that assumptions are met*
-#' 1. gaussian residuals on the link scale: e ~ N(0, sigma^2)
+#' 1. Gaussian residuals on the link scale: e ~ N(0, sigma^2)
 #' 2. constant scale parameter (constant variance on link scale)
 #' 3. linear relationship on the link scale
 #' 4. (conditionally) independent observations
