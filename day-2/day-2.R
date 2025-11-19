@@ -5,9 +5,12 @@ library('ggplot2')   # for fancy plot
 library('ggExtra')   # for marginal histograms
 library('mgcv')      # for modeling
 library('gratia')    # for plotting models
+library('cowplot')   # for multi-panel plots
 theme_set(theme_bw())
 
-chick_weight <- janitor::clean_names(ChickWeight) %>% as_tibble()
+chick_weight <- janitor::clean_names(ChickWeight) %>%
+  as_tibble() %>%
+  filter(diet == 1)
 chick_weight
 
 ggplot(chick_weight, aes(time, weight, group = chick)) +
@@ -129,29 +132,184 @@ ggExtra::ggMarginal(
 #' `0 <= Y <= 1`: `logit(0, 1) = log(odds(0, 1)) = log(0,Inf) = (-Inf,Inf)`
 #' there are other options, but these are sufficient (especially with GAMs)
 
+#' *note:* link functions introduce two new terms:
+#' - *response scale*: the original response values; e.g., (0, Inf), (0, 1)
+#' - *link scale*: the transformed response values; generally (-Inf, Inf)
+
+#' *note:* link function is applied to the *mean*, not to the data directly
+
+#' `E(Y) = mu`
+#' `g(mu) = eta = b_0 + b_1 * x_1 + b_2 * x_2`
+
 #' *fitting Generalized Linear Models*
 
+#' *Gaussian models give bad fits*
+m_lm <- gam(formula = weight ~ time,
+            family = gaussian(link = 'identity'),
+            data = chick_weight)
+draw(m_lm, parametric = TRUE)
+
+new_d <- tibble(time = seq(0, 21, length.out = 400)) # for predictions
+
+# to plot predictions quickly
+plot_preds <- function(.model) {
+  fitted_values(object = .model, data = new_d) %>%
+    ggplot() +
+    geom_ribbon(aes(time, ymin = .lower_ci, ymax = .upper_ci),
+                fill = 'darkorange', alpha= 0.3) +
+    geom_line(aes(time, y = .fitted), color = 'darkorange') +
+    geom_point(aes(time, weight), chick_weight, alpha = 0.3)
+}
+
+# does not follow the data well
+plot_preds(m_lm)
+
+# gives impossible predictions (negative weight 3-5 days before hatching)
+fitted_values(m_lm, data = tibble(time = -5:0))
+
+#' *Gamma GLM fits better*
+m_glm <- gam(formula = weight ~ time,
+             family = Gamma(link = 'log'),
+             data = chick_weight)
+draw(m_lm, parametric = TRUE) #' *note:* partial effect is on log scale
+plot_preds(m_glm) #' `eta = log(mu)` implies `mu = exp(eta)`
+
+# values are strictly positive, even a million years before hatching!
+fitted_values(m_glm, data = tibble(time = -5:0))
+fitted_values(m_glm, data = tibble(time = -1e6 * 365.25))
 
 #' *model diagnostics*
+#' `plot()` version of `gratia::appraise()`
+layout(matrix(1:4, ncol = 2))
+gam.check(m_glm)
+layout(1)
 
+appraise(m_glm, method = 'simulate', n_simulate = 100, point_alpha = 0.3)
+
+plot_preds(m_glm) # look at plot again carefully
+
+#' *check that assumptions are met*
+#' 1. gaussian residuals on the link scale: e ~ N(0, sigma^2)
+#' 2. constant scale parameter (constant variance on link scale)
+#' 3. linear relationship on the link scale
+#' 4. (conditionally) independent observations
+
+#' diagnostic plots (assumptions to check):
+#' *qq plot* (1):  points should be near the red line
+#' *residuals vs linear predictor* (2-4): points should be a random scatter
+#' *histogram* (1): should be close to gaussian
+#' *obs vs fitted* (3, 4): points should fall near 1:1 line
+
+# Q: how would you interpret the diagnostic plots?
 
 #' *limitations of GLMs*
-
+# - cannot account for nonlinear trends
+# - require polynomials for non-monotonic trends
+# - assume relatively rigid relationships
 
 #' ========================================================================
 
 # Part 2 ----
 #' *fitting Generalized Additive Models*
+#' *Gamma GAM fits better*
+m_gam <- gam(formula = weight ~ s(time),
+             family = Gamma(link = 'log'),
+             data = chick_weight,
+             method = 'REML') # method for selecting smoothness
 
+draw(m_gam) # sublinear trend (growth slows down: slope decreases)
 
-#' *interpreting nonlinear terms*
+plot_preds(m_gam) # sub-exponential growth, especially near the end
 
-
-#' *selecting model complexity*
-
-
-#' *modeling seasonal and daily trends*
-
+# again, values are strictly positive because of log link
+fitted_values(m_gam, data = tibble(time = -5:0))
+fitted_values(m_gam, data = tibble(time = -1e6 * 365.25))
 
 #' *model diagnostics*
+appraise(m_gam, method = 'simulate', n_simulate = 100, point_alpha = 0.3)
 
+# Q: how would you interpret the diagnostic plots?
+
+#' *interpreting nonlinear terms*
+#' smooth terms are constructed using *splines*: smooth nonlinear functions
+#' splines don't have a single slope; the slope changes with the predictor
+#' mathematically more complex than `b_1 * x_1`
+#' more flexible: learn from the data without forcing relationships
+#' still interpretable, unlike "AI" (neural networks, etc.)
+
+#' *selecting model complexity*
+d_ouf <- readr::read_csv('data/ouf-sim.csv', show_col_types = FALSE) %>%
+  mutate(dec_date = lubridate::decimal_date(date))
+d_ouf
+
+ggplot(d_ouf, aes(date, compound_1)) + geom_point(alpha = 0.3)
+
+plot_k <- function(.k) {
+  .m <- gam(compound_1 ~ s(dec_date, k = .k, bs = 'cr'),
+            Gamma(link = 'log'), d_ouf, method = 'REML')
+  
+  plot_grid(
+    draw(.m, residuals = TRUE, n = 1e3) &
+      ggtitle(paste0('k = ', .k, '; EDF = ', round(summary(.m)$edf, 1))),
+    draw(basis(.m, "s(dec_date)")))
+}
+
+#' `k`: number of knots; results in `k - 1` basis functions
+#' `EDF`: effective degrees of freedom; allows to compare to a polynomial
+#' `method = 'REML'` somewhat constrains the fit
+#' for more info, see:
+#' - `doi.org/10.3389/fevo.2018.00149`
+#' - `doi.org/10.48550/arXiv.2507.06281`
+plot_k(10) #' default `k` is 10 for `s()`
+
+plot_k(3)  #' lowering `k` forces fewer basis functions and a smoother term
+plot_k(20) #' increasing `k` allows more basis functions and wiggliness
+plot_k(100) 
+plot_k(200) #' very high `k` allows for strong oscillations
+
+# differences are not always substantial
+plot_k(20)
+plot_k(15)
+
+#' Q: how do you choose `k`?
+#' Q: how do you distinguish noise from signal?
+
+#' *modeling seasonal and daily trends*
+d_co2 <- tibble(dec_date = as.vector(time(co2)),
+                year = floor(dec_date),
+                season = dec_date - year,
+                co2_ppm = as.vector(co2))
+d_co2
+
+ggplot(d_co2, aes(dec_date, co2_ppm)) + geom_point(alpha = 0.3)
+
+m_co2 <- gam(co2_ppm ~ s(year, k = 10) + s(season, bs = 'cc', k = 10),
+             data = d_co2, family = Gamma(link = 'log'), method = 'REML',
+             knots = list(season = c(0, 1))) # force 0 and 1 to match
+draw(m_co2)
+
+#' reducing `k` too much can result in excessively rigid smooths
+gam(co2_ppm ~ s(year, k = 10) + s(season, bs = 'cc', k = 10),
+    data = d_co2, family = Gamma(link = 'log'), method = 'REML',
+    knots = list(season = c(0, 1))) %>%
+  draw()
+
+#' increasing `k` too much can prevent the model from converging
+gam(co2_ppm ~ s(year, k = 10) + s(season, bs = 'cc', k = 30),
+    data = d_co2, family = Gamma(link = 'log'), method = 'REML',
+    knots = list(season = c(0, 1))) %>%
+  draw()
+
+#' choosing `k` depends on what you consider as signal
+draw(m_co2)
+gam(co2_ppm ~ s(year, k = 35) + s(season, bs = 'cc', k = 10),
+    data = d_co2, family = Gamma(link = 'log'), method = 'REML',
+    knots = list(season = c(0, 1))) %>%
+  draw()
+gam(co2_ppm ~ s(year, k = 5) + s(season, bs = 'cc', k = 10),
+    data = d_co2, family = Gamma(link = 'log'), method = 'REML',
+    knots = list(season = c(0, 1))) %>%
+  draw()
+
+# Q: any major issues in the diagnostics?
+appraise(m_co2, method = 'simulate', point_alpha = 0.3)
