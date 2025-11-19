@@ -330,7 +330,7 @@ summary(lm_1)
 #' `Parametric coefficients`: table for intercept & slope coefs containing:
 #'    - estimates
 #'    - standard errors
-#'    - t values (sometimes zz values if variance = mean)
+#'    - t values (sometimes z values if variance = mean)
 #'    - p values
 #' `R-sq. (adj.)`: adjusted R^2
 #' `Deviance explained`: percentage of deviance explained by the model
