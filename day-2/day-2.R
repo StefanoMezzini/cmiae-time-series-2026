@@ -1,14 +1,10 @@
 #' day 1: 2026-02-03
 # attach necessary packages
 library('dplyr')     # for data wrangling
-# library('tidyr')     # for data wrangling
-# library('purrr')     # for functional programming
-# library('lubridate') # for working with dates
 library('ggplot2')   # for fancy plot
 library('ggExtra')   # for marginal histograms
 library('mgcv')      # for modeling
 library('gratia')    # for plotting models
-# library('cowplot')   # for multi-panel plots
 theme_set(theme_bw())
 
 chick_weight <- janitor::clean_names(ChickWeight) %>% as_tibble()
@@ -87,25 +83,51 @@ ggExtra::ggMarginal(
   xparams = list(bins = 10, fill = '#004488'),
   yparams = list(bins = 10, fill = '#DDAA33'))
 
-#' moving beyond Gaussian models: *how to choose a family of distributions*
+#' moving beyond Gaussian models:
 #' **fit the model to the data, not the data to the model!**
+
+#'  *choose a family of distributions based on the range of the response*
 ?stats::family
 
-#' `binomial(link = "logit")`: binary (0/1 data; mean is `p = P(success)`)
-#' `gaussian(link = "identity")`: all real numbers (-Inf, Inf)
-#' `Gamma(link = "log")`: strictly positive; no zeros (0, Inf)
-#' `poisson(link = "log")`: count data (positive integers including zero)
+#' `binomial`: binary (0/1 data; mean is `p = P(success)`)
+#' `gaussian`: unbounded data: all real numbers (-Inf, Inf)
+#' `Gamma`: `Y > 0`; `Var(Y)` proportional to `E(Y)^2`
+#' `poisson`: count data (integers), `Y >= 0`; `Var(Y) = E(Y)`
+#' `inverse.gaussian`: `Y > 0; Var(Y) = E(Y)^3 * lambda`; rarely used
+#' `quasibinomial`: `binomial` but with over/under-dispersion parameter
+#' `quasipoisson`: `poisson` but with over/under-dispersion parameter
 
 ?mgcv::family.mgcv
+#' `tw`: between Poisson (`p=1`) and Gamma data (`p=2`); `Y >= 0`
+#' `Tweedie`: like `tw`, but `p` is specificed (`Y >= 0`)
+#' `nb`: n attempts before p successes; overdispersed poisson
+#' `negbin`: like `nb`, but scale term is specificed
+#' `betar`: ratio data (bounded [0, 1]); can also be used for NDVI
 
+#' `ocat`: ordered categorical data (e.g., small < medium < big)
+#' `scat`: scaled t data (unbounded, like gaussian, but thicker tails)
+#' `ziP`: zero-inflated count data (e.g., counts with many zeros)
+#' `cox.ph`: cox proportional hazards (survival analysis)
+#' `multinom`: unordered categorical data (e.g., colors)
 
-# other families
-#' `inverse.gaussian(link = "log")`: strictly positive; uncommon
-#' `quasibinomial(link = "logit")`: 
-#' `quasipoisson(link = "log")`: 
+#' `cnorm`, `bcg`, `clog`, `cpois`: censored data
 
-#' *link functions*
+#' *multiple linear predictors (a list of formulae; require lots of data)*
+#' *location-scale are for trends in the mean-variance relationship*
+#' `mvn`: multivariate normal data (separate variances with a v-cov matrix)
+#' `gaulss`: location-scale gaussian, unbounded data
+#' `gammals`: location-scale gamma
+#' `ziplss`: location-scale zero-inflated poisson
+#' `twlss`: location-scale tweedie
+#' `gumbls`: extreme values (maxima, minima)
+#' `gevlss`: extreme values (generalization of Gumbel, Fréchet, & Weibull)
+#' `shash`: extremely flexible generalization of normal (VERY data-hungry!)
 
+#' *choose a link function based on the support of the distribution*
+#' unbounded: identity; `I(-Inf, Inf) = (-Inf, Inf)`
+#' `Y >= 0` or `Y > 0`: `log(0, Inf) = (-Inf, Inf)`
+#' `0 <= Y <= 1`: `logit(0, 1) = log(odds(0, 1)) = log(0,Inf) = (-Inf,Inf)`
+#' there are other options, but these are sufficient (especially with GAMs)
 
 #' *fitting Generalized Linear Models*
 
