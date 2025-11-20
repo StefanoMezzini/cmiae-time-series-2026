@@ -313,3 +313,12 @@ gam(co2_ppm ~ s(year, k = 5) + s(season, bs = 'cc', k = 10),
 
 # Q: any major issues in the diagnostics?
 appraise(m_co2, method = 'simulate', point_alpha = 0.3)
+
+#' *if you want to learn more*
+#' - think of some common datasets you use. what distributions would you
+#'   use to model the response variable?
+#' - look at the wikipedia page for that distribution. what is the
+#'   relationship between the mean and the variance? are they independent,
+#'   or can you write the variance as a function of the mean?
+#' - does the relationship make biological sense?
+#' - how does this relationship affect how you think of the variable?
