@@ -8,6 +8,7 @@ library('mgcv')      # for modeling
 library('gratia')    # for plotting models
 library('cowplot')   # for multi-panel plots
 library('khroma')    # for color palettes
+library('lubridate') # for working with dates
 theme_set(theme_bw())
 
 #' import the `co2` dataset and change to a format usable by `gam()`
@@ -170,6 +171,27 @@ p_year
 
 #' *interpreting credible intervals produced by mgcv*
 
+#' CIs have close to nominal Frequentist coverage properties:
+#' - on average, the Bayesian credible intervals produced by `mgcv` contain
+#'   `(1 - alpha) * 100%` of the true function
+#' - this breaks down with smooth terms that are close to a straight line
+#'   and estimated as a straight line, but including the intercept fixes
+#'   the issue
+#'   see `https://doi.org/10.1111/j.1467-9469.2011.00760.x`
+set.seed(10)
+d_ci <- as_tibble(gamSim(n = 400))
+d_ci
+
+m_ci <- gam(y ~ s(x0) + s(x1) + s(x2) + s(x3), data = d_ci, method = 'REML')
+#' on average, the CIs should contain `(1-alpha)*100%` of the true function
+draw(m_ci)
+
+#' on average, CIs for `s(x3)` will contain less than `(1 - alpha) * 100%`
+#' of the true function because their width is zero near `x3 = 0.5`
+draw(m_ci, overall_uncertainty = FALSE)
+
+#' *simultaneous* intervals (covered later) will contain the *entire* true
+#' function `(1 - alpha) * 100%` of the time
 
 #' *creating publication-level figures*
 p_doy <-
@@ -215,3 +237,104 @@ plot_grid(plot_grid(p_year, p_doy, labels = 'AUTO', nrow = 1),
 
 #' *deciding sampling frequency before data collection*
 
+#' There is no clear rule for deciding sampling frequency exactly, but you
+#' should aim to have (at least) a few samples for each period of interest,
+#' if possible. For example, if you want to estimate monthly levels of a
+#' certain compound, a measurement every month is ok, but multiple
+#' measurements per month is best.
+d_ouf <- readr::read_csv('data/ouf-sim.csv', col_types = 'Ddd') %>%
+  mutate(month = paste(month.name[month(date)], year(date)),
+         week = floor(as.numeric(date) / 7)) %>% # n 7-day periods since origin
+  mutate(monthly_mean = mean(compound_1), .by = month)
+
+## daily measurements
+# monthly time series and means
+ggplot(d_ouf, aes(date, compound_1)) +
+  facet_wrap(~ month, scales = 'free') +
+  geom_line(aes(date, monthly_mean), color = 'darkorange') +
+  geom_line() +
+  geom_point()
+
+# full time series
+ggplot(d_ouf, aes(date, compound_1)) +
+  geom_line() +
+  geom_point(alpha = 0.3) +
+  geom_line(aes(y = monthly_mean), color = 'darkorange', lwd = 1)
+
+## weekly measurements
+# monthly time series and sample means
+# differences are present but not always alarming
+d_ouf %>%
+  slice(1, .by = week) %>%
+  mutate(sample_mean = mean(compound_1), .by = month) %>%
+  ggplot(aes(date, compound_1)) +
+  facet_wrap(~ month, scales = 'free') +
+  geom_line(aes(date, monthly_mean), color = 'darkorange') +
+  geom_line(aes(date, sample_mean), color = 'dodgerblue4') +
+  geom_line() +
+  geom_point()+
+  geom_point(data = d_ouf, alpha = 0.1)
+
+# thinned time series
+d_ouf %>%
+  slice(1, .by = week) %>%
+  ggplot(aes(date, compound_1)) +
+  geom_line(aes(y = monthly_mean), color = 'darkorange', lwd = 1) +
+  geom_line(data = d_ouf) +
+  geom_point() +
+  geom_point(data = d_ouf, alpha = 0.1)
+
+## monthly measurements
+# monthly samples: differences are quite prominent
+d_ouf %>%
+  slice(15, .by = month) %>%
+  ggplot(aes(date, compound_1)) +
+  facet_wrap(~ month, scales = 'free') +
+  geom_point(aes(date, monthly_mean), color = 'darkorange') +
+  geom_point(aes(date, compound_1), color = 'dodgerblue4') +
+  geom_point(data = d_ouf, alpha = 0.1)
+
+# thinned time series
+d_ouf %>%
+  slice(15, .by = month) %>%
+  ggplot(aes(date, compound_1)) +
+  geom_line(aes(y = monthly_mean), d_ouf, color = 'darkorange', lwd = 1) +
+  geom_line() +
+  geom_point() +
+  geom_point(data = d_ouf, alpha = 0.1)
+
+#' multiple measurements per period of interest allows one to account for
+#' the noise in the data and separate it from the signal. one sample per
+#' period prevents us from being able to distinguish the two.
+
+#' *if you want to learn more*
+#' I generated the `d_ouf` dataset via an Ornstein-Uhlenbeck Foraging (OUF)
+#' model (`https://doi.org/10.1086/675504`) that I created with the `ctmm`
+#' package (`https://doi.org/10.1111/2041-210X.12559`). More specifically,
+#' the `compound_1` and `compound_2` variables are simulated x and y
+#' coordinates for how animals move in space. The two are generated using
+#' a bivariate Gaussian distribution to generate samples from an underlying
+#' continuous-time trajectory.
+ggplot(d_ouf, aes(compound_1, compound_2)) +
+  geom_path()
+
+#' In the context of animal tracking, the manuscripts below address
+#' some issues that may be of interest. Although these references are
+#' specific to animal tracking, the ideas of sampling intensity apply to
+#' time series in general. In this case, speed is the trend we want to
+#' estimate, and directional persistence is the amount of time for which an
+#' animal will move at approximately with the same speed and direction.
+#' Generalizing this idea, a minimum of 3 samples per period (ideally more)
+#' will give an appreciable estimates for that period (e.g., three samples
+#' per month for a monthly average). In other words, the sampling interval
+#' should be no larger than a third of the period of interest (e.g., every
+#' 10 days for a 30-day average).
+#' 
+#' References for further reading:
+#' - coarse sampling hides information and can produce incorrect results:
+#'   `https://doi.org/10.1126/science.abg1780`
+#' - how fine should sampling be to estimate speed accurately?
+#'   `https://doi.org/10.1186/s40462-019-0177-1`
+#' - what happens if you try forcing speed estimation when the signal is
+#'   not in the data?
+#'   `https://doi.org/10.1101/2025.07.17.665364`
