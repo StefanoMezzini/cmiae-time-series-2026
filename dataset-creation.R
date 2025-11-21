@@ -1,8 +1,13 @@
-library('dplyr')   # for data wrangling
-library('tidyr')   # for data wrangling
-library('ctmm')    # for continuous-time stochastic processes
-library('ggplot2') # for fancy plots
+library('dplyr')   #' for data wrangling
+library('tidyr')   #' for data wrangling
+library('ctmm')    #' for continuous-time stochastic processes
+library('ggplot2') #' for fancy plots
+library('mgcv')    #' for `gamSim()`
+library('readr')   #' for saving csv files
+library('gratia')  #' for plotting GAMs and their diagnostics
+theme_set(theme_bw())
 
+# OUF simulation ----
 mm <- ctmm(tau = c(100, 3), isotropic = FALSE, mu = c(0, 0), sigma = 1)
 
 ouf_sim <-
@@ -22,5 +27,27 @@ ouf_sim %>%
   geom_line() +
   geom_point(alpha = 0.3)
 
-readr::write_csv(ouf_sim, file = 'data/ouf-sim.csv')
-readr::read_csv('data/ouf-sim.csv', col_types = 'Ddd')
+write_csv(ouf_sim, file = 'data/ouf-sim.csv')
+read_csv('data/ouf-sim.csv', col_types = 'Ddd')
+
+# simulated data for yers since disturbance ----
+set.seed(2)
+d_disturbance <- gamSim(eg = 4, n = 1000) %>%
+  transmute(perc_forest = x0 * 100,
+            elevation_m = x1 * 200 + 750,
+            years = x2 * 25,
+            site = factor(paste('Site', fac)),
+            animals_per_km2 = (rpois(n(), lambda = y - min(y) + 1) + 1) / 2) %>%
+  as_tibble()
+d_disturbance
+
+m <- gam(animals_per_km2 ~
+           s(perc_forest, by = site) +
+           s(elevation_m, by = site) +
+           s(years, by = site),
+         family = tw(link = 'log'), data = d_disturbance, method = 'REML')
+draw(m)
+appraise(m, point_alpha = 0.3)
+
+write_csv(d_disturbance, 'data/disturbance-data.csv')
+read_csv('data/disturbance-data.csv', col_types = 'dddfd')
