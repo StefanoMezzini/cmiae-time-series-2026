@@ -1,4 +1,4 @@
-#' day 1: 2026-02-03; *Introduction to nonlinear trend detection*
+#' day 1: *Introduction to nonlinear trend detection*
 # attach necessary packages
 library('dplyr')     # for data wrangling
 library('ggplot2')   # for fancy plot

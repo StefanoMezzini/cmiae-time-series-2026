@@ -1,4 +1,4 @@
-#' day 3: 2026-02-10; *Applications of GAMs*
+#' day 3: *Applications of GAMs*
 # attach necessary packages
 library('dplyr')     # for data wrangling
 library('tidyr')     # for data wrangling
@@ -172,7 +172,8 @@ p_year
 
 #' CIs have close to nominal Frequentist coverage properties:
 #' - on average, the Bayesian credible intervals produced by `mgcv` contain
-#'   `(1 - alpha) * 100%` of the true function
+#'   `(1 - alpha) * 100%` of the true function, i.e., each point has an
+#'   independent "point-wise" CI 
 #' - this breaks down with smooth terms that are close to a straight line
 #'   and estimated as a straight line, but including the intercept fixes
 #'   the issue
@@ -189,8 +190,9 @@ draw(m_ci)
 #' of the true function because their width is zero near `x3 = 0.5`
 draw(m_ci, overall_uncertainty = FALSE)
 
-#' *simultaneous* intervals (covered later) will contain the *entire* true
-#' function `(1 - alpha) * 100%` of the time
+#' *simultaneous* intervals (i.e., calculated for all points at once;
+#' covered more later) contain the *entire* true function with probability
+#' `(1 - alpha)`
 
 #' *creating publication-level figures*
 p_doy <-

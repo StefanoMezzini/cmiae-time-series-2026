@@ -1,4 +1,4 @@
-#' day 1: 2026-01-27; *Review and intro to linear trend detection*
+#' day 1: *Review and intro to linear trend detection*
 #' 
 #' before we start...
 #' run `necessary-packages.R` to install all the packages we'll use
