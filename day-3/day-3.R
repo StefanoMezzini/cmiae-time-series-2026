@@ -1,5 +1,4 @@
-#' day 3: 2026-02-10
-
+#' day 3: 2026-02-10; *Applications of GAMs*
 # attach necessary packages
 library('dplyr')     # for data wrangling
 library('tidyr')     # for data wrangling
