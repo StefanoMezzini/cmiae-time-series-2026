@@ -227,6 +227,8 @@ d_dist <- read_csv('data/disturbance-data.csv', col_types = 'dddfd') %>%
 summary(d_dist)
 
 # quick data viz before fitting a model
+density_lab <- expression(Population~density~(km^'-2'))
+
 d_dist %>%
   pivot_longer(c(forest_perc, elevation_m, years)) %>%
   mutate(name = case_when(name == 'forest_perc' ~ 'Forest cover (%)',
@@ -238,7 +240,7 @@ d_dist %>%
   geom_point(alpha = 0.3) +
   geom_smooth(method = 'gam', formula = y ~ s(x), color = 'darkorange',
               fill = 'darkorange') +
-  labs(x = NULL, y = expression(Population~density~(km^'-2'))) +
+  labs(x = NULL, y = density_lab) +
   theme(strip.placement = 'outside', strip.background = element_blank(),
         strip.text = element_text(size = 11))
 
@@ -343,8 +345,7 @@ ggplot(samples) +
               alpha = 0.3, fill = 'darkorange', color = 'darkorange')+
   geom_line(aes(years, .fitted), years_preds, color = 'darkorange',
             linewidth = 1.5) +
-  labs(x = 'Years after disturbance',
-       y = expression(Population~density~(km^'-2'))) +
+  labs(x = 'Years after disturbance', y = density_lab) +
   scale_fill_devon(name = 'Count', reverse = TRUE)
 
 #' *estimating probability of the mean surpassing a threshold*
@@ -365,16 +366,58 @@ means_summary <- means %>%
 
 # plot the results
 ggplot() +
+  geom_hline(yintercept = 8, lty = 'dashed', color = 'red3') +
+  # simulated draws (spaghetti plot)
   geom_line(aes(years, .fitted, group = .draw), filter(means, .draw <= 2e3),
             alpha = 0.03) +
-  geom_ribbon(aes(years, ymin = lwr, ymax = upr), means_summary,
+  # 95% CI from the simulated draws
+  geom_ribbon(aes(years, ymin = lwr, ymax = upr), means_summary, lwd = 0.8,
               fill = 'transparent', color = 'black', lty = 'dashed') +
+  # estimated mean from the simulated draws
   geom_line(aes(years, mu_hat, color = p_above_8), means_summary,
             linewidth = 1.5) +
+  labs(x = 'Years after disturbance', y = density_lab) +
   scale_color_distiller(expression(P(hat(mu)~'>'~8)), palette = 14,
                         direction = 1)
 
-#' **HERE** add the following to extra work?
+# can also do this with interaction terms
+m_dist_ti <-
+  gam(animals_per_km2 ~ s(forest_perc) + s(elevation_m) + s(years) +
+        ti(forest_perc, years), # interaction between forest_perc and years
+      family = tw(link = 'log'), data = d_dist, method = 'REML')
+
+new_d_dist_2 <- data_slice(m_dist_ti,
+                           years = evenly(years, 100),
+                           forest_perc = evenly(forest_perc, 100))
+
+means_summary_ti <-
+  add_fitted_samples(new_d_dist_2, m_dist_ti, n = 500, # for a fast example
+                   unconditional = TRUE) %>%
+  summarize(years = unique(years),
+            forest_perc = unique(forest_perc),
+            elevation_m = unique(elevation_m),
+            mu_hat = mean(.fitted),
+            p_above_8 = mean(.fitted > 8),
+            .by = .row)
+
+# population density
+ggplot(means_summary_ti) +
+  geom_raster(aes(years, forest_perc, fill = mu_hat)) +
+  geom_contour(aes(years, forest_perc, z = p_above_8), color = 'black') +
+  scale_x_continuous('Years after disturbance', expand = c(0, 0)) +
+  scale_y_continuous('Forest cover (%)', expand = c(0, 0)) +
+  scale_fill_lipari(name = density_lab)
+
+# P(mu_hat > 8)
+ggplot(means_summary_ti) +
+  geom_raster(aes(years, forest_perc, fill = p_above_8)) +
+  geom_contour(aes(years, forest_perc, z = p_above_8), color = 'black') +
+  scale_x_continuous('Years after disturbance', expand = c(0, 0)) +
+  scale_y_continuous('Forest cover (%)', expand = c(0, 0)) +
+  scale_fill_distiller(expression(P(hat(mu)~'>'~8)), palette = 14,
+                       direction = 1)
+
+#' **HERE** add the rate of change stuff as extra work?
 
 #' *estimating probability of surpassing a threshold (rate of change)*
 #' note: other variables are kept constant
@@ -403,13 +446,27 @@ ggplot() +
 #' Q: what are some scenarios in your work where you could implement the
 #'    methods shown here for estimating significant rates of change?
 #' - repeat the exercises on estimating the probability of exceeding a
-#'   threshold, but use less data. how does that affect the results?
-#' - repeat the analyses again, but use more data using the shortcut below,
-#'   then compare the results again
-large_dataset <- predicted_samples(m_...)
+#'   threshold, but using less data. how does that affect the results and
+#'   your interpretation?
+m_dist_small <-
+  gam(animals_per_km2 ~ s(forest_perc) + s(elevation_m) + s(years),
+      family = tw(link = 'log'),
+      data = slice_sample(d_dist, prop = 0.1), # 10% sample
+      method = 'REML')
 
-#' 
-#' For some examples, see:
+#' - repeat the analyses again, but use more data using simulated with
+#'   `posterior_samples()` as below, then compare the results again
+d_dist_large <-
+  add_posterior_samples(d_dist, m_dist, n = 10) %>%
+  select(! animals_per_km2) %>%
+  rename(animals_per_km2 = .response)
+m_dist_large <-
+  gam(animals_per_km2 ~ s(forest_perc) + s(elevation_m) + s(years),
+      family = tw(link = 'log'),
+      data = d_dist_large, # larger sample
+      method = 'REML')
+
+#' For some reading on using rates of change in ecology, see:
 #' - critical transitions: `https://doi.org/10.1371/journal.pone.0041010`
 #' - responses to multifarious change: `https://doi.org/10.1111/gcb.17594`
 #' - lake level & structural changes: `https://doi.org/10.1002/lno.12054`
