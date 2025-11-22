@@ -417,24 +417,55 @@ ggplot(means_summary_ti) +
   scale_fill_distiller(expression(P(hat(mu)~'>'~8)), palette = 14,
                        direction = 1)
 
-#' **HERE** add the rate of change stuff as extra work?
-
 #' *estimating probability of surpassing a threshold (rate of change)*
-#' note: other variables are kept constant
-#' number of rows is `nrow(newd_d_dist) * n_sim = 500 * 1e4`
-derivative_samples(m_dist, focal = 'years', data = new_d_dist, n_sim = 100) %>%
+#' note: other variables are kept constant with `focal = 'years'`
+slopes <- derivative_samples(m_dist, focal = 'years', data = new_d_dist,
+                             n_sim = 1e4)
+
+ggplot(filter(slopes, .draw <= 100)) +
+  geom_hline(yintercept = 0, lty = 'dashed') +
+  geom_line(aes(years, .derivative, group = .draw), alpha = 0.1) +
+  labs(x = 'Years after disturbance', y = density_lab)
+
+slopes %>%
+  summarize(years = unique(years),
+            lwr = quantile(.derivative, 0.025), # lower 95% CI
+            est_slope = mean(.derivative),
+            upr = quantile(.derivative, 0.975), # upper 95% CI
+            p_above_0.5 = mean(.derivative > 0.5),
+            .by = .row) %>%
   ggplot() +
-  geom_line(aes(years, .derivative, group = .draw), alpha = 0.1)
+  geom_hline(yintercept = 0, lty = 'dashed') +
+  geom_hline(yintercept = 0.5, lty = 'dashed', color = 'red3') +
+  # simulated draws (spaghetti plot)
+  geom_line(aes(years, .derivative, group = .draw),
+            filter(slopes, .draw <= 2e3), alpha = 0.03) +
+  # 95% CI from the simulated draws
+  geom_ribbon(aes(years, ymin = lwr, ymax = upr), lwd = 0.8,
+              fill = 'transparent', color = 'black', lty = 'dashed') +
+  # estimated mean from the simulated draws
+  geom_line(aes(years, est_slope, color = p_above_0.5), linewidth = 1.5) +
+  labs(x = 'Years after disturbance', y = density_lab) +
+  scale_color_distiller('P(Slope > 0.5', palette = 14, direction = 1)
 
-#' *predicting beyond the range of available data (univariate)*
+#' *predicting beyond the range of available data*
+# we have seen that GAMs are quite efficient at interpolating smoothly 
+# because GAMs are so flexible, they can struggle to predict past the data,
+# and the uncertainty grows rapidly (and possibly unrealistically)
+data_slice(m_dist, years = seq(0, 50, length.out = 400)) %>%
+  conditional_values(model = m_dist, condition = 'years', data = .) %>%
+  draw() +
+  labs(x = 'Years after disturbance', y = density_lab)
 
-
-#' *predicting beyond the range of available data (bivariate)*
-ggplot() +
-  geom_raster(aes(years, forest_perc, fill = p_above_8), means_summary) +
-  scale_fill_distiller(expression(P(hat(mu)~'>'~8)), palette = 14,
-                       direction = 1)
-
+#' similar caution should apply with 2D smooths, but the increased
+#' flexibility may cause even more issues. However, extrapolations can
+#' be quite convenient if the smooth terms are sufficiently smooth, e.g.:
+#' - responses to multifarious change: `https://doi.org/10.1111/gcb.17594`
+#' - rising temperatures alter mammalian movement: `github.com/QuantitativeEcologyLab/bc-mammals-temperature/blob/main/writing/manuscript.pdf`
+#' if you need to forecast past the extent of the data, B-splines may be a
+#' good option, but forecasting without deterministic terms is complex if
+#' trends are very wiggly. for more info, see:
+#' `https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/`
 
 #' *extra work for those interested*
 #' - re-fit `m_wiggly_tw` using an adaptive spline. see `?mgcv::s` and
