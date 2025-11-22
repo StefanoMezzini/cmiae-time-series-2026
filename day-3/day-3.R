@@ -172,12 +172,12 @@ p_year
 
 #' CIs have close to nominal Frequentist coverage properties:
 #' - on average, the Bayesian credible intervals produced by `mgcv` contain
-#'   `(1 - alpha) * 100%` of the true function, i.e., each point has an
-#'   independent "point-wise" CI 
+#'   `(1 - alpha) * 100%` of the true function, i.e., each value of the
+#'   predictor variable has a "pointwise" Frequentist confidence interval
 #' - this breaks down with smooth terms that are close to a straight line
 #'   and estimated as a straight line, but including the intercept fixes
 #'   the issue
-#'   see `https://doi.org/10.1111/j.1467-9469.2011.00760.x`
+#'   see `https://doi.org/10.1111/j.1467-9469.2011.00760.x` for more info
 set.seed(10)
 d_ci <- as_tibble(gamSim(n = 400))
 d_ci
