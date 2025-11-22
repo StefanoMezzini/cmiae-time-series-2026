@@ -9,6 +9,7 @@ library('gratia')    # for plotting models
 library('cowplot')   # for multi-panel plots
 library('khroma')    # for color palettes
 library('lubridate') # for working with dates
+source('functions/plot_acf.R') #' `ggplot2` version of `stats:::plot.acf()`
 theme_set(theme_bw())
 
 d_ouf <- read_csv('data/ouf-sim.csv', col_types = 'Ddd') %>%
@@ -27,13 +28,20 @@ m_glm <- gam(compound_1 ~ dec_date,
 draw(m_glm, parametric = TRUE)
 draw(m_glm, parametric = TRUE, ci_level = 0.001, ci_alpha = 0) # hide CIs
 
-#' slope is -0.345 on the log scale
-#' drops to `exp(-0.345) = 0.708 = 70.8%` of the previous year's value
-summary(m_glm)
+summary(m_glm) #' slope is change after a year on the log scale
+coef(m_glm)
+exp(coef(m_glm)['dec_date']) # relative change every year
 
-# Q: the term is significant, but does it matter? Is this a good estimate?
+#' you could subtract a value so that `x` it's a lower number
+#' (generally not ideal because it can cause confusion when predicting)
+m_glm_2 <- gam(compound_1 ~ I(dec_date - 2023),
+               data = d_ouf,
+               family = Gamma(link = 'log'), # response is strictly positive
+               method = 'REML')
+draw(m_glm_2, parametric = TRUE)
+summary(m_glm_2) # intercept is shifted, but slope is unchanged
 
-# Q: what counts as noise and what counts as trend?
+# extract the fitted values (i.e., predictions) and plot them 
 fitted_values(m_glm, scale = 'response') %>%
   ggplot() +
   geom_ribbon(aes(dec_date, ymin = .lower_ci, ymax = .upper_ci),
@@ -42,7 +50,13 @@ fitted_values(m_glm, scale = 'response') %>%
   geom_line(aes(dec_date, .fitted), color = 'darkorange', lwd = 1) +
   labs(x = 'Year CE', y = 'Compound 1')
 
-# diagnostics are clearly not great
+#' *note:* change is nonlinear: decrease to 70% every year 
+
+# Q: the term is significant, but does it matter? Is this a good estimate?
+
+# Q: what counts as noise and what counts as trend?
+
+# the diagnostics are clearly not great
 appraise(m_glm, point_alpha = 0.3)
 
 # model the data using a smooth term
@@ -50,32 +64,41 @@ m_smooth <- gam(compound_1 ~ s(dec_date, k = 20),
                 data = d_ouf,
                 family = Gamma(link = 'log'),
                 method = 'REML')
+
+#' *note:* `s(dec_date)` is centered at 0
 draw(m_smooth, n = 200, residuals = TRUE)
+
+#' `(Intercept)` is now the average response across the smooth term
+summary(m_smooth)
+exp(coef(m_smooth)['(Intercept)'])
+mean(d_ouf$compound_1) #' *note:* `mean(s(dec_date)) != mean(compound_1)`
 
 # diagnostics are not great but better than the GLM
 appraise(m_smooth, point_alpha = 0.3)
 
-#' Q: again, are the oscillations around the smooth noise or signal?
+#' Q: again, are the oscillations around `s(dec_date)` noise or signal?
 
 # model the data using a very wiggly smooth term
-m_wiggly <- gam(compound_1 ~ s(dec_date, k = 200),
+# as the smooth gets more wiggly, errors get smaller
+m_wiggly <- gam(compound_1 ~ s(dec_date, k = 150),
                 data = d_ouf,
                 family = Gamma(link = 'log'),
                 method = 'REML')
 draw(m_wiggly, n = 500, residuals = TRUE)
 
-# diagnostics are better, but mean-variance relationship is wrong
-# tails are too long or middle quantiles are too concentrated
+# diagnostics are better, but mean-variance relationship is wrong:
+# middle quantiles are too concentrated
 appraise(m_wiggly, point_alpha = 0.3)
 
 # re-fit with Tweedie family
-m_wiggly_tw <- gam(compound_1 ~ s(dec_date, k = 400),
+m_wiggly_tw <- gam(compound_1 ~ s(dec_date, k = 150),
                    data = d_ouf,
                    family = tw(link = 'log'),
                    method = 'REML')
 
 # diagnostics look reasonable now
 #' specifying `n_simulate` because `method = 'uniform'` is not available
+#' increase `n_simulate` for more accurate intervals
 appraise(m_wiggly_tw, point_alpha = 0.3, n_simulate = 10)
 
 #' estimated mean is essentially identical to the Gamma model...
@@ -86,37 +109,54 @@ draw(m_wiggly_tw, n = 500, residuals = TRUE)
 #' Tweedie variance is `phi * mu^p` for `p` in `(1, 2)`
 #' the model has `p = 1.01`, so the variance is approximately `phi * mu`
 
-#' Q: is the model overfit?
+#' Q: is the model overfit? why or why not?
 
-#' *note:* there is still some autocorrelation in the residuals
-acf(resid(m_wiggly_tw), plot = FALSE) %>%
-  with(data.frame(lag = lag, acf = acf)) %>%
-  ggplot() +
-  geom_hline(aes(yintercept = 0)) +
-  geom_segment(aes(x = lag, y = 0, xend = lag, yend = acf)) +
-  geom_hline(yintercept = qnorm(0.025)/sqrt(nrow(d_ouf)),
-             linetype = 3, color = 'darkblue') +
-  geom_hline(yintercept = qnorm(0.975)/sqrt(nrow(d_ouf)),
-             linetype = 3, color = 'darkblue')
+#' *note:* there is still some autocorrelation in the residuals, but
+#'         removing it fully with the GAM alone risks over-fitting it
+plot_acf(m_wiggly_tw)
+
+#' still much better than `m_smooth` or `m_glm`
+plot_acf(m_smooth)
+plot_acf(m_glm)
+
+#' **break** --------------------------------------------------------------
+
+#' *an important note on credible intervals* 
+#' *pointwise* credible intervals:
+#' - at *individual* `years`, `P(true function in CI) = 1 - alpha`
+#' - if values across `s(years)` are independent, ~95% of should be in CI
+#' - are approximately across-the-function Frequentist confidence intervals
+#' *simultaneous* credible intervals:
+#' - across *all* `years`, `P(true function in CI) = 1 - alpha`
+#' - values across `s(years)` are not assumed to be independent
+#' - the CI contains the true function with probability `1 - alpha`
 
 #' *detecting periods of statistically significant change*
 #' *note:* derivatives are on the link scale, but the significance applies
 #'         to the response scale, too
+lvl <- 0.999 # using 99.9% CIs
+
 slopes_smooth <- bind_cols(
   d_ouf,
-  # slopes with CIs for across the function (not pointwise)
-  derivatives(m_smooth, data = d_ouf, interval = 'simultaneous',
-              level = 0.99) %>%
+  #' slopes with CIs for across the function: *simultaneous, not pointwise*
+  derivatives(m_smooth, data = d_ouf, interval = 'simultaneous', level = lvl) %>%
     transmute(est_deriv = .derivative,
               lwr_deriv = .lower_ci,
               upr_deriv = .upper_ci),
+  # add smooth estimates on link scale
+  smooth_estimates(m_smooth, data = d_ouf, select = 's(dec_date)',
+                   overall_uncertainty = FALSE, ci_level = lvl) %>%
+    add_confint(coverage = lvl) %>%
+    transmute(est_smooth = .estimate,
+              lwr_smooth = .lower_ci,
+              upr_smooth = .upper_ci),
   # add fitted values on link scale
-  fitted_values(m_smooth, data = d_ouf, scale = 'link') %>%
+  fitted_values(m_smooth, data = d_ouf, scale = 'link', ci_level = lvl) %>%
     transmute(est_link = .fitted,
               lwr_link = .lower_ci,
               upr_link = .upper_ci),
   # add fitted values on response scale
-  fitted_values(m_smooth, data = d_ouf, scale = 'response') %>%
+  fitted_values(m_smooth, data = d_ouf, scale = 'response', ci_level = lvl) %>%
     transmute(est_resp = .fitted,
               lwr_resp = .lower_ci,
               upr_resp = .upper_ci)) %>%
@@ -134,19 +174,27 @@ slopes_smooth <- bind_cols(
   pivot_wider(values_from = value, names_from = estimate_type) %>%
   mutate(parameter =
            case_when(parameter == 'deriv' ~ 'Derivative',
+                     parameter == 'smooth' ~ 'Smooth term',
                      parameter == 'link' ~ 'Fitted (link scale)',
-                     parameter == 'resp' ~ 'Fitted (response scale)'))
+                     parameter == 'resp' ~ 'Fitted (response scale)') %>%
+           factor(c('Derivative', 'Smooth term', 'Fitted (link scale)',
+                    'Fitted (response scale)')))
 
 # plot smooths and derivatives with direction of change
+ref_lines <- tibble(yint = c(0, 0, coef(m_smooth)['(Intercept)'],
+                             exp(coef(m_smooth)['(Intercept)'])),
+                    parameter = unique(slopes_smooth$parameter))
+
 ggplot(slopes_smooth) +
   facet_grid(parameter ~ ., scales = 'free_y') +
-  geom_hline(aes(yintercept = yint),
-             tibble(yint = 0, parameter = 'Derivative'), lty = 'dashed') +
+  geom_hline(aes(yintercept = yint), ref_lines, lty = 'dashed') +
   geom_ribbon(aes(dec_date, ymin = lwr, ymax = upr), alpha = 0.2) +
   geom_line(aes(dec_date, est, color = direction, group = 1),
-            linewidth = 1) +
+            linewidth = 1.5) +
   labs(x = 'Year CE', y = 'Compound 1') +
-  scale_color_brewer(name = 'Direction of change', type = 'qual', palette = 6)
+  scale_color_brewer(name = 'Direction of change', type = 'qual',
+                     palette = 6) +
+  theme(legend.position = 'top')
 
 #' plot smooths and derivatives with direction of *significant* change
 ggplot(slopes_smooth) +
@@ -158,10 +206,11 @@ ggplot(slopes_smooth) +
   geom_line(aes(dec_date, est), alpha = 1) +
   geom_line(aes(dec_date, est, color = direction, group = group),
             data = filter(slopes_smooth, significant),
-            linewidth = 1) +
+            linewidth = 1.5) +
   labs(x = 'Year CE', y = 'Compound 1') +
   scale_color_brewer(name = 'Direction of change', type = 'qual',
-                     palette = 6)
+                     palette = 6) +
+  theme(legend.position = 'top')
 
 #' *choosing how many years to monitor*
 #' - >= 3 samples per period (see `day3.R`)
@@ -200,7 +249,7 @@ appraise(m_dist, point_alpha = 0.3) # diagnostics are ok
 draw(m_dist)
 
 # generate a dataset to predict from with all other variables present
-new_d_dist <- data_slice(m_dist, years = evenly(x = years, n = 500))
+new_d_dist <- data_slice(m_dist, years = evenly(years, n = 500))
 
 # get predictions (note: confounding variables are fixed)
 years_preds <- fitted_values(object = m_dist, data = new_d_dist,
@@ -250,6 +299,7 @@ years_preds %>%
 #' `fitted_samples()`    includes uncertainty in the estimated coefficients
 #' `predicted_samples()` includes uncertainty in sampling of the response
 #' `posterior_samples()` includes uncertainty in both the coefs & response
+#' the `add_*` version of the functions bind the data automatically
 
 #' *note:* `smooth_samples()` gives samples for a smooth excluding any
 #'          other smooth or parametric term (such as the model intercept),
@@ -258,11 +308,14 @@ years_preds %>%
 add_smooth_samples(new_d_dist, m_dist, n = 100, select = 's(years)') %>%
   ggplot() + geom_line(aes(years, .value, group = .draw), alpha = 0.1)
 
-#' the `add_*` version of the functions bind the data automatically
+#' `fitted_samples()` gives samples predicted on the response scale and
+#' including the model intercept
 add_fitted_samples(object = new_d_dist, m_dist, n = 100) %>%
   ggplot() + geom_line(aes(years, .fitted, group = .draw), alpha = 0.1)
 
 samples <-
+  # simulate samples of the derivatives for the given dataset
+  #' `unconditional=TRUE` accounts for uncertainty in smoothness parameter
   derivative_samples(m_dist, focal = 'years', data = new_d_dist,
                      n_sim = 100, unconditional = TRUE) %>%
   rename(derivative = .derivative) %>%
@@ -281,20 +334,47 @@ samples <-
 
 #' *note*: the CIs are pointwise, not simultaneous
 ggplot(samples) +
-  #' samples of estimated mean: `Var(mu_hat) = sigma^2 / n`
-  geom_hex(aes(years, posterior), color = '#00000020') +
   #' samples of the response: `Var(animals_per_km2) = sigma^2`
+  geom_hex(aes(years, posterior), color = '#00000020') +
+  #' samples of estimated mean: `Var(mu_hat) = sigma^2 / n`
   geom_line(aes(years, fitted, group = .draw), color = '#FFFFFF80')+
   #' estimated mean: `Var(animals_per_km2) = sigma^2`
   geom_ribbon(aes(years, ymin = .lower_ci, ymax = .upper_ci), years_preds,
               alpha = 0.3, fill = 'darkorange', color = 'darkorange')+
   geom_line(aes(years, .fitted), years_preds, color = 'darkorange',
-            linewidth = 1) +
+            linewidth = 1.5) +
   labs(x = 'Years after disturbance',
        y = expression(Population~density~(km^'-2'))) +
   scale_fill_devon(name = 'Count', reverse = TRUE)
 
-#' *estimating probability of surpassing a threshold (mean)*
+#' *estimating probability of the mean surpassing a threshold*
+# simulate many (>= 1e4) draws from the posterior of the estimated mean
+means <- add_fitted_samples(new_d_dist, m_dist, n = 1e4,
+                            unconditional = TRUE)
+
+# find how many samples exceed the threshold
+means_summary <- means %>%
+  summarize(years = unique(years),
+            forest_perc = unique(forest_perc),
+            elevation_m = unique(elevation_m),
+            lwr = quantile(.fitted, 0.025), # lower 95% CI
+            mu_hat = mean(.fitted),
+            upr = quantile(.fitted, 0.975), # upper 95% CI
+            p_above_8 = mean(.fitted > 8),
+            .by = .row)
+
+# plot the results
+ggplot() +
+  geom_line(aes(years, .fitted, group = .draw), filter(means, .draw <= 2e3),
+            alpha = 0.03) +
+  geom_ribbon(aes(years, ymin = lwr, ymax = upr), means_summary,
+              fill = 'transparent', color = 'black', lty = 'dashed') +
+  geom_line(aes(years, mu_hat, color = p_above_8), means_summary,
+            linewidth = 1.5) +
+  scale_color_distiller(expression(P(hat(mu)~'>'~8)), palette = 14,
+                        direction = 1)
+
+#' **HERE** add the following to extra work?
 
 #' *estimating probability of surpassing a threshold (rate of change)*
 #' note: other variables are kept constant
@@ -303,10 +383,34 @@ derivative_samples(m_dist, focal = 'years', data = new_d_dist, n_sim = 100) %>%
   ggplot() +
   geom_line(aes(years, .derivative, group = .draw), alpha = 0.1)
 
-#' *repreat P(Y > threshold) with less data?*
-
 #' *predicting beyond the range of available data (univariate)*
 
 
 #' *predicting beyond the range of available data (bivariate)*
+ggplot() +
+  geom_raster(aes(years, forest_perc, fill = p_above_8), means_summary) +
+  scale_fill_distiller(expression(P(hat(mu)~'>'~8)), palette = 14,
+                       direction = 1)
 
+
+#' *extra work for those interested*
+#' - re-fit `m_wiggly_tw` using an adaptive spline. see `?mgcv::s` and
+#'   `?mgcv::smooth.construct.ad.smooth.spec` for more information. how
+#'   does the new basis affect the fit? Try setting `k = 20` and comparing
+#'   it to the fit using the default basis of `bs = 'tp'`.
+#' - create an object like `slopes_smooth` but with `m_wiggly_tw`. how
+#'   would you interpret the plot?
+#' Q: what are some scenarios in your work where you could implement the
+#'    methods shown here for estimating significant rates of change?
+#' - repeat the exercises on estimating the probability of exceeding a
+#'   threshold, but use less data. how does that affect the results?
+#' - repeat the analyses again, but use more data using the shortcut below,
+#'   then compare the results again
+large_dataset <- predicted_samples(m_...)
+
+#' 
+#' For some examples, see:
+#' - critical transitions: `https://doi.org/10.1371/journal.pone.0041010`
+#' - responses to multifarious change: `https://doi.org/10.1111/gcb.17594`
+#' - lake level & structural changes: `https://doi.org/10.1002/lno.12054`
+#' - lake eutrophication: `https://doi.org/10.1111/fwb.14192`
