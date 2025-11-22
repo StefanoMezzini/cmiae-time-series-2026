@@ -186,7 +186,7 @@ layout(1)
 
 appraise(m_glm, method = 'simulate', n_simulate = 100, point_alpha = 0.3)
 
-plot_preds(m_glm) # look at plot again carefully
+plot_preds(m_glm) # estimated line is too high initially and at the end
 
 #' *check that assumptions are met*
 #' 1. Gaussian residuals on the link scale: e ~ N(0, sigma^2)
@@ -207,7 +207,8 @@ plot_preds(m_glm) # look at plot again carefully
 # - require polynomials for non-monotonic trends
 # - assume relatively rigid relationships
 
-#' ========================================================================
+
+#' **break** --------------------------------------------------------------
 
 # Part 2 ----
 #' *fitting Generalized Additive Models*
@@ -219,7 +220,8 @@ m_gam <- gam(formula = weight ~ s(time),
 
 draw(m_gam) # sublinear trend (growth slows down: slope decreases)
 
-plot_preds(m_gam) # sub-exponential growth, especially near the end
+# GAM has sub-exponential, near-linear growth, especially near the end
+plot_grid(plot_preds(m_glm), plot_preds(m_gam))
 
 # again, values are strictly positive because of log link
 fitted_values(m_gam, data = tibble(time = -5:0))
@@ -264,8 +266,8 @@ plot_k(10) #' default `k` is 10 for `s()`
 
 plot_k(3)  #' lowering `k` forces fewer basis functions and a smoother term
 plot_k(20) #' increasing `k` allows more basis functions and wiggliness
-plot_k(100) 
-plot_k(200) #' very high `k` allows for strong oscillations
+plot_k(100) #' high `k` allows for strong oscillations
+plot_k(200) #' very high `k` allows for small-scale oscillations
 
 # differences are not always substantial
 plot_k(20)
@@ -302,11 +304,11 @@ gam(co2_ppm ~ s(year, k = 10) + s(season, bs = 'cc', k = 30),
 
 #' choosing `k` depends on what you consider as signal
 draw(m_co2)
-gam(co2_ppm ~ s(year, k = 35) + s(season, bs = 'cc', k = 10),
+gam(co2_ppm ~ s(year, k = 35) + s(season, bs = 'cc', k = 10), # wigglier
     data = d_co2, family = Gamma(link = 'log'), method = 'REML',
     knots = list(season = c(0, 1))) %>%
   draw()
-gam(co2_ppm ~ s(year, k = 5) + s(season, bs = 'cc', k = 10),
+gam(co2_ppm ~ s(year, k = 5) + s(season, bs = 'cc', k = 10), # smoother
     data = d_co2, family = Gamma(link = 'log'), method = 'REML',
     knots = list(season = c(0, 1))) %>%
   draw()

@@ -297,7 +297,7 @@ d_ts %>%
 
 #' *if review topics are still unclear, review them before next week*
 
-#' ***break**
+#' **break** --------------------------------------------------------------
 
 #' ========================================================================
 
@@ -468,20 +468,18 @@ draw(lm_co2_int_1, parametric = TRUE, rug = FALSE,
      data = tibble(year = seq(1959, 1997, length.out = 400),
                    season = seq(0, 0.9166667, length.out = 400)))
 
-p_int_1 <-
-  fitted_values(object = lm_co2_int_1, data = d_co2) %>%
+fitted_values(object = lm_co2_int_1, data = d_co2) %>%
   ggplot() +
   geom_point(aes(dec_date, co2_ppm), d_co2, alpha = 0.5) +
   geom_ribbon(aes(dec_date, ymin = .lower_ci, ymax = .upper_ci),
               fill = 'darkorange', alpha = 0.3) +
   geom_line(aes(dec_date, .fitted), color = 'darkorange', linewidth = 1)
-p_int_1
 
 draw(lm_co2_int_1, parametric = TRUE,
      data = tibble(year = 1959:1997,
                    season = seq(0, 1, length.out = length(year))))
 
-# 
+# increase polynomial complexity
 lm_co2_int_2 <-
   gam(co2_ppm ~
         poly(year, 4) + # long-term trend
