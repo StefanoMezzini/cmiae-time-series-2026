@@ -179,8 +179,8 @@ summary(d_dist)
 
 # quick data viz before fitting a model
 d_dist %>%
-  pivot_longer(c(perc_forest, elevation_m, years)) %>%
-  mutate(name = case_when(name == 'perc_forest' ~ 'Forest cover (%)',
+  pivot_longer(c(forest_perc, elevation_m, years)) %>%
+  mutate(name = case_when(name == 'forest_perc' ~ 'Forest cover (%)',
                           name == 'elevation_m' ~ 'Elevation (m a.s.l.)',
                           name == 'years' ~ 'Years since disturbance')) %>%
   ggplot(aes(value, animals_per_km2)) +
@@ -194,7 +194,7 @@ d_dist %>%
         strip.text = element_text(size = 11))
 
 # fit the model
-m_dist <- gam(animals_per_km2 ~ s(perc_forest) + s(elevation_m) + s(years),
+m_dist <- gam(animals_per_km2 ~ s(forest_perc) + s(elevation_m) + s(years),
               family = tw(link = 'log'), data = d_dist, method = 'REML')
 appraise(m_dist, point_alpha = 0.3) # diagnostics are ok
 draw(m_dist)

@@ -33,7 +33,7 @@ read_csv('data/ouf-sim.csv', col_types = 'Ddd')
 # simulated data for yers since disturbance ----
 set.seed(2)
 d_disturbance <- gamSim(eg = 4, n = 1000) %>%
-  transmute(perc_forest = x0 * 100,
+  transmute(forest_perc = x0 * 100,
             elevation_m = x1 * 200 + 750,
             years = x2 * 25,
             site = factor(paste('Site', fac)),
@@ -42,7 +42,7 @@ d_disturbance <- gamSim(eg = 4, n = 1000) %>%
 d_disturbance
 
 m <- gam(animals_per_km2 ~
-           s(perc_forest, by = site) +
+           s(forest_perc, by = site) +
            s(elevation_m, by = site) +
            s(years, by = site),
          family = tw(link = 'log'), data = d_disturbance, method = 'REML')
