@@ -308,6 +308,20 @@ d_ouf %>%
 #' the noise in the data and separate it from the signal. one sample per
 #' period prevents us from being able to distinguish the two.
 
+#' *extra work for those interested*
+#' - now that you have some experience with GAMs, try fitting some to some
+#'   of your datasets using the families you explored in the questions
+#'   from day 2. try changing the values of `k`, and maybe exploring the
+#'   different types of bases -- see `?mgcv::smooth.terms` for more info.
+#' Q: what happens if you set `k` below the number of unique values of the
+#'    predictor variable? why do you think this happens?
+#' - try creating some figures for the models. can you think of scenarios
+#'   where you may want to exclude terms from the predictions? when could
+#'   you predict for a single smooth and even exclude the intercept term?
+#' Q: since GAM's smooth terms don't have a single coefficient estimate,
+#'    how would you determine if changes are significant over a predictor
+#'    variable (e.g., time, level of contamination, population density)?
+
 #' *if you want to learn more*
 #' I generated the `d_ouf` dataset via an Ornstein-Uhlenbeck Foraging (OUF)
 #' model (`https://doi.org/10.1086/675504`) that I created with the `ctmm`

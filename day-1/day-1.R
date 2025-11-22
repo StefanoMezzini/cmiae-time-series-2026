@@ -539,6 +539,10 @@ plot_grid(draw(gam(co2_ppm ~ poly(season, 1), data = d_co2),
 #' Q: how many samples do you need to estimate a significant trend?
 
 #' *extra work for those interested*
+#' Q: can you think of datasets you use regularly where applying a linear
+#'    model limits your analyses? how could using a different model affect
+#'    the results and how you interpret them?
+#'    
 #' Q: how would you model the three datasets below?
 #' Q: how does using linear models restrict you?
 #' Q: what would you do to overcome the models' limitations?
