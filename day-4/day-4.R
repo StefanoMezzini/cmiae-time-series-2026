@@ -392,7 +392,7 @@ new_d_dist_2 <- data_slice(m_dist_ti,
 
 means_summary_ti <-
   add_fitted_samples(new_d_dist_2, m_dist_ti, n = 500, # for a fast example
-                   unconditional = TRUE) %>%
+                     unconditional = TRUE) %>%
   summarize(years = unique(years),
             forest_perc = unique(forest_perc),
             elevation_m = unique(elevation_m),
@@ -416,6 +416,32 @@ ggplot(means_summary_ti) +
   scale_y_continuous('Forest cover (%)', expand = c(0, 0)) +
   scale_fill_distiller(expression(P(hat(mu)~'>'~8)), palette = 14,
                        direction = 1)
+
+#' *estimating probability of the data surpassing a threshold*
+posterior_samples <- add_posterior_samples(new_d_dist, m_dist, n = 1e4,
+                                           unconditional = TRUE)
+
+# hex plot of probability density of the data
+ggplot(posterior_samples) +
+  geom_hex(aes(years, .response, fill = after_stat(count / sum(count)))) +
+  geom_hline(yintercept = 8, lty = 'dashed', color = 'red3') +
+  labs(x = 'Years after disturbance', y = density_lab) +
+  scale_fill_lapaz(name = 'Density')
+
+# surface plot of the empirical cumulative density function
+posterior_samples %>%
+  summarize(ecdf_fun = list(ecdf(.response)), .by = years) %>%
+  mutate(probs = purrr::map(ecdf_fun, function(.fun) {
+    tibble(pop_dens = seq(0, 25, by = 0.01),
+           p = .fun(pop_dens))
+  })) %>%
+  select(! ecdf_fun) %>%
+  unnest(probs) %>%
+  ggplot() +
+  geom_raster(aes(years, pop_dens, fill = p)) +
+  geom_hline(yintercept = 8, lty = 'dashed', color = 'red3') +
+  labs(x = 'Years after disturbance', y = density_lab) +
+  scale_fill_tokyo(name = 'ECDF', reverse = TRUE)
 
 #' *estimating probability of surpassing a threshold (rate of change)*
 #' note: other variables are kept constant with `focal = 'years'`
@@ -478,7 +504,7 @@ data_slice(m_dist, years = seq(0, 50, length.out = 400)) %>%
 #'    methods shown here for estimating significant rates of change?
 #' - repeat the exercises on estimating the probability of exceeding a
 #'   threshold, but using less data. how does that affect the results and
-#'   your interpretation?
+#'   your interpretation? how does this relate to statistical power?
 m_dist_small <-
   gam(animals_per_km2 ~ s(forest_perc) + s(elevation_m) + s(years),
       family = tw(link = 'log'),
@@ -487,10 +513,14 @@ m_dist_small <-
 
 #' - repeat the analyses again, but use more data using simulated with
 #'   `posterior_samples()` as below, then compare the results again
+#' Q: how does increasing the sample size affect the statistical power?
+#' Q: how does increasing the sample size affect your perspective of the
+#'    typical Frequentist hypothesis-testing approach to statistics? 
 d_dist_large <-
   add_posterior_samples(d_dist, m_dist, n = 10) %>%
   select(! animals_per_km2) %>%
   rename(animals_per_km2 = .response)
+
 m_dist_large <-
   gam(animals_per_km2 ~ s(forest_perc) + s(elevation_m) + s(years),
       family = tw(link = 'log'),
