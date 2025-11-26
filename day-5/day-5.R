@@ -96,43 +96,119 @@ ggplot() +
 draw(m_cw_3)
 
 #' Q: how would you assess common trends for a specific diet?
-#' **HERE**
+
+#' add a global smooth term (warning is ok)
 m_cw_4 <- bam(weight ~
-                s(time) + # common smooth effect of time
-                s(time, diet, bs = 'fs') + #'deviations from common `s()`
-                s(time, chick, bs = 'fs') + #' chick-level deviations
-                diet, 
-              family = Gamma(link = 'log'), # weight is > 0
+                s(time) + # global smooth effect of time
+                s(time, chick, bs = 'fs'), # chick-level deviations
+              family = Gamma(link = 'log'),
               data = chick_weight,
-              method = 'REML', # fast REML
-              discrete = TRUE) # requires fREML
+              method = 'fREML',
+              discrete = TRUE)
+draw(m_cw_4)
+appraise(m_cw_4, point_alpha = 0.3) # residuals are still underdispersed
 
-
-m_cw_x <- bam(weight ~
-                s(time) + # common smooth effect of time
-                s(time, diet, bs = 'fs') + #'deviations from common `s()`
-                s(time, chick, bs = 'fs') + #' chick-level deviations
-                diet, 
-              family = Gamma(link = 'log'), # weight is > 0
+#' account for similarities within each diet
+m_cw_5 <- bam(weight ~
+                s(time) +
+                s(time, diet, bs = 'fs') + # diet-level smooth 
+                s(time, chick, bs = 'fs'), 
+              family = Gamma(link = 'log'),
               data = chick_weight,
-              method = 'REML', # fast REML
-              discrete = TRUE) # requires fREML
+              method = 'fREML',
+              discrete = TRUE)
+draw(m_cw_5) # diet smooths were shrunken to linear terms
+appraise(m_cw_5, point_alpha = 0.3) # residuals are still underdispersed
 
-#'
-#' **break** --------------------------------------------------------------
-#' 
+#' allow each diet to have a separate smoothness parameter
+m_cw_5 <- bam(weight ~
+                diet + #' intercepts are not included in `by` smooths
+                s(time, by = diet) + # diet-level smooth 
+                s(time, chick, bs = 'fs'), 
+              family = Gamma(link = 'log'),
+              data = chick_weight,
+              method = 'fREML',
+              discrete = TRUE)
+draw(m_cw_5) # diet smooths were shrunken to linear terms
+appraise(m_cw_5, point_alpha = 0.3) # residuals are still underdispersed
+
+#' there are many different types of models you can set up:
+#' see figures 2 and 4 of `https://peerj.com/articles/6876/`
+#' the `diet` intercept could also be a RE, even if the smooth is `by` diet
+
+# add a global smooth
+m_cw_tw <-
+  bam(weight ~ diet + s(time, by = diet) + s(time, chick, bs = 'fs'), 
+      family = tw(link = 'log'), # to account for underdispersion
+      data = chick_weight,
+      method = 'fREML',
+      discrete = TRUE)
+draw(m_cw_tw)
+appraise(m_cw_tw, point_alpha = 0.3) # QQ plot is not perfect, but it's ok
+
+# we can also use a continuous variable to account for differences in diet
+m_cw_tw_2 <-
+  bam(weight ~
+        s(time) +
+        s(time, chick, bs = 'fs') +
+        s(protein_percent, k = 3) +
+        ti(time, protein_percent, k = c(10, 3)), 
+      family = tw(link = 'log'), # to account for underdispersion
+      data = chick_weight,
+      method = 'fREML',
+      discrete = TRUE)
+
+#' the terms are arguably more interpretable than with diets as factors,
+#' as this model directly estimates the effect of protein.
+draw(m_cw_tw_2, dist = 1)
+#' `s(protein_percent)`: protein-rich food increases the chicks' masses;
+#' this is like an improved version of `s(diet, bs = 're')`. 
+#' `ti(time, protein_percent)` chicks with less protein in their diet have
+#' a flatter growth curve than the marginal smooth of `s(time)`, while
+#' chicks with more protein have a steeper growth curve.
+
+#' **break**
+
 #' experimental design and inference
-#' BACI design
-#' control and treatment sites
-#' `by` binary smooths
-#' assuming site 1
-#' is a control site, and sites 2 and 3 use different recovery procedures
-#' after disturbance. 
-d_dist <- read_csv('data/disturbance-data.csv', col_types = 'dddcd') %>%
-  mutate(site = factor(site), #' sites are out of order if `col_type = 'f'`
-         disturbed = if_else())
+summary(m_cw_tw_2)
+#' `(Intercept)`: mean across the effects of `time` and `protein_percent`
+#' `s()` terms are the marginal effects, i.e., effects for the variable
+#'   after setting all other variables to the mean effect across the smooth
+#' `ti()` is the change the marginal effect of `time` with `protein_percent`
+#' and vice-versa
 
-density_lab <- expression(Population~density~(km^'-2'))
+summary(m_cw_tw)
+#' `(Intercept)` is the mean weight across time for the control group
+#' `diet2` is the difference between the second diet and `(Intercept)`
+#' `diet3` is the difference between the third diet and `(Intercept)`
+#' `diet4` is the difference between the fourth diet and `(Intercept)`
+#' each `s(time):dietX` is an independent smooth of time with a separate
+#'   smoothness parameter for each `diet`; significance indicates
+#'   significant
+#' `s(time,chick)` is the group of `chick`-level random smooths of time;
+#'   significance indicates significant variation across groups. may also
+#'   indicate significant change if a group-level smooth is not included.
+#' *note:* significance is approximate, and p-values are likely too small
+#' because they neglect smoothing parameter uncertainty.
+
+#' *BACI design*:
+#' - Before: start sampling before the treatment for a baseline
+#' - After: continue sampling after the treatment to estimate change
+#' - Control: keep a group undisturbed to account for changes in conditions
+#' - Impact: assess the effect of the treatment relative to the control
+
+#' example dataset:
+#' - Site 1: control site
+#' - Site 2: disturbed site
+#' - Site 3: disturbed site with a treatment for faster recovery
+#' the response is the number of animals / km^2 of an invasive species
+d_dist <-
+  read_csv('data/disturbance-data-full.csv', col_types = 'dddcd') %>%
+  mutate(site = factor(site, paste('Site', 1:3)), # to have correct order
+         disturbed_fac = factor(disturbed),
+         treated_fac = factor(treated))
+
+density_lab <- expression(Population~density~(km^'-2')) # label for plots
 
 # exploratory plot
 d_dist %>%
@@ -142,6 +218,8 @@ d_dist %>%
                           name == 'years' ~ 'Years since disturbance')) %>%
   ggplot(aes(value, animals_per_km2)) +
   facet_grid(site ~ name, scales = 'free_x', switch = 'x') +
+  geom_vline(aes(xintercept = x), lty = 'dashed',
+             data = tibble(x = 0, name = 'Years since disturbance')) +
   geom_point(alpha = 0.3) +
   geom_smooth(method = 'gam', formula = y ~ s(x), color = 'darkorange',
               fill = 'darkorange') +
@@ -149,10 +227,95 @@ d_dist %>%
   theme(strip.placement.x = 'outside', strip.background.x = element_blank(),
         strip.text.x = element_text(size = 11))
 
-m <- gam(animals_per_km2 ~ s(years, by = ))
+#' model each site separately using `by` factor smooths
+m_dist_fe_1 <- bam(animals_per_km2 ~
+                    site + # fixed-effect intercept
+                    s(forest_perc, by = site) + # fixed-effect smooths
+                    s(elevation_m, by = site) +
+                    s(years, by = site),
+                  family = tw(link = 'log'),
+                  data = d_dist,
+                  method = 'fREML',
+                  discrete = TRUE)
+draw(m_dist_fe_1, scales = 'fixed')
+summary(m_dist_fe_1)
+# each site is modeled independently, so it's hard to say what the effects
+# of the disturbance and treatment are. significance indicates significant
+# effect (no comparisons across sites)
 
-#' predicting out of sample (random effects)
-#' forecasting (leveraging hierarchical structure)
+# use random effects for each site
+m_dist_re_1 <- bam(animals_per_km2 ~
+                    s(site, bs = 're') + # random intercept
+                    s(forest_perc, site, bs = 'fs') + # random smooths
+                    s(elevation_m, site, bs = 'fs') +
+                    s(years, site, bs = 'fs'),
+                  family = tw(link = 'log'),
+                  data = d_dist,
+                  method = 'fREML',
+                  discrete = TRUE)
+draw(m_dist_re_1, scales = 'fixed')
+summary(m_dist_re_1)
+# sites are modeled together, but we can't separate the disturbance effect
+# from that of the treatment. significance indicates significant difference
+# across sites (at least 2 are different)
+
+# use random effects for undisturbed/disturbed and untreated/treated
+m_dist_re_2 <- bam(animals_per_km2 ~
+                   # random intercepts
+                   s(site, bs = 're') +
+                   s(disturbed_fac, bs = 're') +
+                   s(treated_fac, bs = 're') +
+                   # random smooths
+                   s(forest_perc, by = site) +
+                   s(elevation_m, by = site) +
+                   s(years, disturbed_fac, bs = 'fs') +
+                   s(years, treated_fac, bs = 'fs'),
+                 family = tw(link = 'log'),
+                 data = d_dist,
+                 method = 'fREML',
+                 discrete = TRUE)
+draw(m_dist_re_2, scales = 'fixed')
+summary(m_dist_re_2)
+
+#' use `by` binary variable for explicit contrasts
+z <- d_dist %>%
+  mutate(site = factor(paste(site, disturbed, treated)))
+unique(z$site)
+
+m_dist_fe_2 <- bam(animals_per_km2 ~
+                     # random smooths of confounding variables
+                     s(forest_perc, site, bs = 'fs') +
+                     s(elevation_m, site, bs = 'fs') +
+                     # year-specific smooths
+                     s(years) + # reference smooth (control)
+                     s(years, site, bs = 'fs') +
+                     s(years, by = disturbed) + # effect of disturbance
+                     s(years, by = treated), # effect of treatment
+                   family = tw(link = 'log'),
+                   data = z,
+                   # data = d_dist,
+                   method = 'fREML',
+                   discrete = TRUE)
+draw(m_dist_fe_2)
+draw(m_dist_fe_2, select = 3:5) & geom_vline(xintercept = 0, lty='dashed')
+summary(m_dist_fe_2)
+#' `(Intercept)` is the mean response for the control, averaged across
+#'   the smooth effects of `forest_perc`, `elevation_m`, and `years`
+#' *note:* not across the average `forest_perc`, `elevation_m`, and `years
+#' `siteSite 2` is the difference in the intercept and site 2's mean
+#' `siteSite 3` is the difference in the intercept and site 3's mean
+#' `s(forest_perc,site)` is the set of random smooths for `forest_perc`.
+#'   all three smooths have the same smoothness parameter.
+#' `s(elevation_m,site)` is the set of random smooths for `elevation_m`.
+#'   all three smooths have the same smoothness parameter.
+#' `s(years)` is the estimated effect of 
+#'  
+#' *note:* significance is approximate, and p-values are likely too small
+#' because they neglect smoothing parameter uncertainty.
+
+#' **move up to chick dataset:**
+#' - predicting out of sample (random effects)
+#' - forecasting (leveraging hierarchical structure)
 
 
 #' *extra work for those interested*
