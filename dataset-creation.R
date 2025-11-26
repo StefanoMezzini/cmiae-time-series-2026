@@ -51,3 +51,59 @@ appraise(m, point_alpha = 0.3)
 
 write_csv(d_disturbance, 'data/disturbance-data.csv')
 read_csv('data/disturbance-data.csv', col_types = 'dddfd')
+
+# simulated data for years since disturbance ----
+set.seed(2)
+d_disturbance <- gamSim(eg = 4, n = 1000) %>%
+  transmute(forest_perc = x0 * 100,
+            elevation_m = x1 * 200 + 750,
+            years = x2 * 25,
+            site = factor(paste('Site', fac), levels = paste('Site', 1:3)),
+            animals_per_km2 = (rpois(n(), lambda = y - min(y) + 1) + 1) / 2) %>%
+  as_tibble()
+d_disturbance
+
+m <- gam(animals_per_km2 ~
+           s(forest_perc, by = site) +
+           s(elevation_m, by = site) +
+           s(years, by = site),
+         family = tw(link = 'log'), data = d_disturbance, method = 'REML')
+draw(m)
+appraise(m, point_alpha = 0.3)
+
+write_csv(d_disturbance, 'data/disturbance-data.csv')
+read_csv('data/disturbance-data.csv', col_types = 'dddfd')
+
+# add control years before the disturbance to the data ----
+mins <- d_disturbance %>%
+  group_by(site) %>%
+  slice(which.min(years))
+
+d_disturbance_previous <-
+  d_disturbance %>%
+  filter(years <= 15) %>%
+  group_by(site) %>%
+  mutate(
+    lambda_0 = mean(animals_per_km2[years < 3]),
+    animals_per_km2 = rpois(n(), lambda_0),
+    years = - seq(0, max(years), length.out = n()))
+
+d_disturbance_2 <- bind_rows(d_disturbance_previous, d_disturbance)
+
+ggplot(d_disturbance_2, aes(years, animals_per_km2)) +
+  facet_grid(site ~ .) +
+  geom_line(aes(color = years > 0, group = 1)) +
+  scale_color_brewer(type = 'qual', palette = 6) +
+  theme(legend.position = 'top')
+
+m <- bam(animals_per_km2 ~
+           s(forest_perc, by = site) +
+           s(elevation_m, by = site) +
+           s(years, by = site),
+         family = tw(link = 'log'), data = d_disturbance_2,
+         method = 'fREML', discrete = TRUE)
+draw(m)
+appraise(m, point_alpha = 0.1)
+
+write_csv(d_disturbance_2, 'data/disturbance-data-full.csv')
+read_csv('data/disturbance-data-full.csv', col_types = 'dddfd')
