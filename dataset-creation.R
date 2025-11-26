@@ -65,7 +65,7 @@ d_disturbance_previous <-
   select(-lambda_0)
 
 d_disturbance_2 <- bind_rows(d_disturbance_previous, d_disturbance) %>%
-  mutate(disturbed = if_else(site == 'Site 1', 0, 1), # has disturbance
+  mutate(disturbed = if_else(years < 0 |site == 'Site 1', 0, 1), # has disturbance
          treated = if_else(site == 'Site 3', 1, 0)) # faster recovery
 
 ggplot(d_disturbance_2, aes(years, animals_per_km2)) +
