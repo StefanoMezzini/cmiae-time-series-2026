@@ -222,7 +222,7 @@ ggplot(slopes_smooth) +
 #' example: we want to estimate the population density of a species
 #' following a disturbance. we account for confounding effects: forest
 #' cover and elevation.
-d_dist <- read_csv('data/disturbance-data.csv', col_types = 'dddfd') %>%
+d_dist <- read_csv('data/disturbance-data.csv', col_types = 'dddcd') %>%
   filter(site == 'Site 3')
 summary(d_dist)
 
