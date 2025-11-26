@@ -14,14 +14,12 @@ chick_weight <- janitor::clean_names(ChickWeight) %>%
 chick_weight
 
 ggplot(chick_weight, aes(time, weight, group = chick)) +
-  facet_wrap(~ diet) +
   geom_line(alpha = 0.5) +
   geom_point(alpha = 0.3)
 
 # part 1:  ----
 # linear models fit poorly to exponential growth data
 ggplot(chick_weight, aes(time, weight)) +
-  facet_wrap(~ diet) +
   geom_line(aes(group = chick), alpha = 0.5) +
   geom_point(alpha = 0.3) +
   geom_smooth(method = 'lm', formula = y ~ x,
@@ -29,7 +27,6 @@ ggplot(chick_weight, aes(time, weight)) +
 
 #' many would log-transform the data, but this doesn't fix the issues... 
 ggplot(chick_weight, aes(time, log(weight))) +
-  facet_wrap(~ diet) +
   geom_line(aes(group = chick), alpha = 0.5) +
   geom_point(alpha = 0.3) +
   geom_smooth(method = 'lm', formula = y ~ x,
