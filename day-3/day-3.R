@@ -93,6 +93,8 @@ predict(m_co2, newdata = new_d, type = 'response', terms = 's(year)')
 predict(m_co2, newdata = new_d, type = 'link',
         exclude = c('(Intercept)', 's(season)', 'ti(year,season)'))
 
+#' **break** --------------------------------------------------------------
+
 #' *plotting model terms*
 # relative change over the years
 tibble(year = seq(1959, 1997, length.out = 400),
