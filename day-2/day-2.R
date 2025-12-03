@@ -15,7 +15,8 @@ chick_weight
 
 ggplot(chick_weight, aes(time, weight, group = chick)) +
   geom_line(alpha = 0.5) +
-  geom_point(alpha = 0.3)
+  geom_point(alpha = 0.3) +
+  labs(x = 'Days since hatching', y = 'Weight (g)')
 
 # part 1:  ----
 # linear models fit poorly to exponential growth data
@@ -23,14 +24,16 @@ ggplot(chick_weight, aes(time, weight)) +
   geom_line(aes(group = chick), alpha = 0.5) +
   geom_point(alpha = 0.3) +
   geom_smooth(method = 'lm', formula = y ~ x,
-              color = 'darkorange', fill = 'darkorange', alpha = 0.3)
+              color = 'darkorange', fill = 'darkorange', alpha = 0.3) +
+  labs(x = 'Days since hatching', y = 'Weight (g)')
 
 #' many would log-transform the data, but this doesn't fix the issues... 
 ggplot(chick_weight, aes(time, log(weight))) +
   geom_line(aes(group = chick), alpha = 0.5) +
   geom_point(alpha = 0.3) +
   geom_smooth(method = 'lm', formula = y ~ x,
-              color = 'darkorange', fill = 'darkorange', alpha = 0.3)
+              color = 'darkorange', fill = 'darkorange', alpha = 0.3) +
+  labs(x = 'Days since hatching', y = 'Weight (g)')
 
 # ...actually, it introduces more:
 
@@ -155,7 +158,8 @@ plot_preds <- function(.model) {
     geom_ribbon(aes(time, ymin = .lower_ci, ymax = .upper_ci),
                 fill = 'darkorange', alpha= 0.3) +
     geom_line(aes(time, y = .fitted), color = 'darkorange') +
-    geom_point(aes(time, weight), chick_weight, alpha = 0.3)
+    geom_point(aes(time, weight), chick_weight, alpha = 0.3) +
+    labs(x = 'Days since hatching', y = 'Weight (g)')
 }
 
 # does not follow the data well
@@ -203,7 +207,6 @@ plot_preds(m_glm) # estimated line is too high initially and at the end
 # - cannot account for nonlinear trends
 # - require polynomials for non-monotonic trends
 # - assume relatively rigid relationships
-
 
 #' **break** --------------------------------------------------------------
 
