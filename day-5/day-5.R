@@ -14,7 +14,7 @@ theme_set(theme_bw())
 # chick weight data used on days 1 and 2, but now with all 4 diets
 chick_weight <- janitor::clean_names(ChickWeight) %>%
   as_tibble() %>%
-  mutate(chick = factor(chick), # remove ordering in the factors
+  mutate(chick = factor(chick, ordered = FALSE), # remove ordering
          # add percent protein for each diet
          protein_percent = case_when(diet == 1 ~ 0,
                                      diet == 2 ~ 10,
@@ -25,7 +25,8 @@ chick_weight <- janitor::clean_names(ChickWeight) %>%
 ggplot(chick_weight, aes(time, weight, group = chick)) +
   facet_wrap(~ diet) +
   geom_line(alpha = 0.5) +
-  geom_point(alpha = 0.3)
+  geom_point(alpha = 0.3) +
+  labs(x = 'Days since hatching', y = 'Mass (g)')
 
 #' Q: what are some advantages of having a longitudinal dataset with
 #'    multiple individuals?
@@ -50,7 +51,7 @@ ggplot(chick_weight, aes(time, weight, group = chick)) +
 #'         shrinkage and assuming common effects rather than a large
 #'         distribution.
 
-#' best model from day 2: only for diet 1; does not account for individuals 
+# best model from day 2: only for diet 1; does not account for individuals 
 m_cw_0 <- gam(formula = weight ~ s(time), # weight varies smoothly w time
               family = Gamma(link = 'log'), # weight > 0
               data = chick_weight,
@@ -59,7 +60,7 @@ m_cw_0 <- gam(formula = weight ~ s(time), # weight varies smoothly w time
 draw(m_cw_0, residuals = TRUE) # clearly does not account for individuals
 appraise(m_cw_0, point_alpha = 0.3) # diagnostics are not great
 
-#' fit a model with data for all 4 diets
+# fit a model with data for all 4 diets (not accounting for individuals)
 m_cw_1 <- gam(formula = weight ~ s(time),
               family = Gamma(link = 'log'),
               data = chick_weight, #' dropped `subset = diet == 1` 
@@ -67,7 +68,7 @@ m_cw_1 <- gam(formula = weight ~ s(time),
 draw(m_cw_1, residuals = TRUE) # clearly does not account for individuals
 appraise(m_cw_1, point_alpha = 0.3) # diagnostics are even worse
 
-#' use a factor smooth for each chick
+# use a factor smooth for each chick
 ?mgcv::smooth.construct.fs.smooth.spec
 m_cw_2 <- gam(weight ~ s(time, chick, bs = 'fs'),
               family = Gamma(link = 'log'),
@@ -91,7 +92,9 @@ m_cw_3 <- bam(weight ~ s(time, chick, bs = 'fs'),
 # the predictions from the two models have a 1:1 relationship
 ggplot() +
   geom_abline(slope = 1, intercept = 0, color = 'red') +
-  geom_point(aes(fitted(m_cw_2), fitted(m_cw_3)), alpha = 0.3)
+  geom_point(aes(fitted(m_cw_2), fitted(m_cw_3)), alpha = 0.3) +
+  labs(x = 'Fitted values for gam() model',
+       y = 'Fitted values for bam() model')
 
 draw(m_cw_3)
 
@@ -108,7 +111,7 @@ m_cw_4 <- bam(weight ~
 draw(m_cw_4)
 appraise(m_cw_4, point_alpha = 0.3) # residuals are still underdispersed
 
-#' account for similarities within each diet
+#' account for similarities and differences across diets
 m_cw_5 <- bam(weight ~
                 s(time) +
                 s(time, diet, bs = 'fs') + # diet-level smooth 
@@ -121,6 +124,7 @@ draw(m_cw_5) # diet smooths were shrunken to linear terms
 appraise(m_cw_5, point_alpha = 0.3) # residuals are still underdispersed
 
 #' allow each diet to have a separate smoothness parameter
+#' diets are allowed to have different levels of wiggliness
 m_cw_5 <- bam(weight ~
                 diet + #' intercepts are not included in `by` smooths
                 s(time, by = diet) + # diet-level smooth 
@@ -134,7 +138,7 @@ appraise(m_cw_5, point_alpha = 0.3) # residuals are still underdispersed
 
 #' there are many different types of models you can set up:
 #' see figures 2 and 4 of `https://peerj.com/articles/6876/`
-#' the `diet` intercept could also be a RE, even if the smooth is `by` diet
+#' the `diet` intercept could even be a RE, even if the smooth is `by` diet
 
 # add a global smooth
 m_cw_tw <-
@@ -167,7 +171,7 @@ draw(m_cw_tw_2, dist = 1)
 #' a flatter growth curve than the marginal smooth of `s(time)`, while
 #' chicks with more protein have a steeper growth curve.
 
-#' **break**
+#' **break** --------------------------------------------------------------
 
 #' experimental design and inference
 summary(m_cw_tw_2)
@@ -190,6 +194,91 @@ summary(m_cw_tw)
 #'   indicate significant change if a group-level smooth is not included.
 #' *note:* significance is approximate, and p-values are likely too small
 #' because they neglect smoothing parameter uncertainty.
+
+#' *predicting out of sample (random effects)*
+# predict for a chick not in the sample for each diet
+# predictions follow the data closely
+chick_weight %>%
+  filter(chick == first(chick), .by = 'diet') %>%
+  fitted_values(object = m_cw_tw, data = ., scale = 'response') %>%
+  ggplot(aes(time, .fitted, group = chick)) +
+  facet_wrap(~ diet) +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci), fill = 'darkorange',
+              alpha = 0.3) +
+  geom_line(color = 'darkorange', lwd = 1) +
+  geom_point(aes(y = weight), chick_weight, alpha = 0.1) +
+  geom_point(aes(y = weight), alpha = 0.5) +
+  labs(x = 'Days since hatching', y = 'Mass (g)')
+
+# predicting for only a chick from diet 1:
+# - uncertainty is greater for the diets the chick didn't eat
+# - estimated mean is somewhat above the group trend because the chick was
+#   above the group trend in diet 1
+data_slice(m_cw_tw,
+           diet = unique(diet),
+           time = evenly(time, 400),
+           chick = filter(chick_weight, diet == 1)$chick[1]) %>%
+  fitted_values(object = m_cw_tw, data = ., scale = 'response') %>%
+  ggplot(aes(time, .fitted, group = chick)) +
+  facet_wrap(~ diet) +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci), fill = 'darkorange',
+              alpha = 0.3) +
+  geom_line(color = 'darkorange', lwd = 1) +
+  geom_point(aes(y = weight), chick_weight, alpha = 0.3) +
+  labs(x = 'Days since hatching', y = 'Mass (g)')
+
+# predict for a new chick not in any of the diets
+# - uncertainty is greater for diets with greater variation
+# - estimated means follow the group-level trends
+data_slice(m_cw_tw,
+           diet = unique(diet),
+           time = evenly(time, 400),
+           chick = 'new chick') %>%
+  fitted_values(object = m_cw_tw, data = ., scale = 'response') %>%
+  ggplot(aes(time, .fitted, group = chick)) +
+  facet_wrap(~ diet) +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci), fill = 'darkorange',
+              alpha = 0.3) +
+  geom_line(color = 'darkorange', lwd = 1) +
+  geom_point(aes(y = weight), chick_weight, alpha = 0.3) +
+  labs(x = 'Days since hatching', y = 'Mass (g)')
+
+#' *predicting beyond the range of the data*
+# find chicks that do not have data up to day 21
+chick_weight_short <- chick_weight %>%
+  mutate(max_t = max(time), .by = chick) %>%
+  filter(max_t < 21)
+
+unique(chick_weight_short$chick)
+
+#' predicting based on the data from one chick alone gives bad predictions
+#' the GAM may not even be able to fit if data are too few
+ggplot(chick_weight_short, aes(time, weight)) +
+  facet_wrap(~ diet + chick) +
+  geom_smooth(method = 'gam', formula = y ~ s(x, k = 5), fullrange = TRUE,
+              color = 'darkorange', fill = 'darkorange') +
+  geom_point(alpha = 0.5) +
+  labs(x = 'Days since hatching', y = 'Mass (g)')
+
+# leverage the hierarchical structure to inform predictions
+chick_weight_short %>%
+  slice(1, .by = chick) %>%
+  mutate(time = list(tibble(time = seq(0, 21, length.out = 400)))) %>%
+  unnest(time) %>%
+  fitted_values(object = m_cw_tw, data = ., scale = 'response') %>%
+  ggplot(aes(x = time)) +
+  facet_wrap(~ paste0('Diet ', diet, '; chick ', chick)) +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci), fill = 'darkorange',
+              alpha = 0.3) +
+  geom_line(aes(y = .fitted), color = 'darkorange', lwd = 1) +
+  geom_point(aes(time, weight), chick_weight_short, alpha = 0.5) +
+  labs(x = 'Days since hatching', y = 'Mass (g)')
+#' *careful!* the predictions the model produces will often tend towards
+#' the group trends, which may not be appropriate: chicks in top row are
+#' expected to start growing faster despite having being removed from the
+#' experiment (likely due to poor health)
+
+#' **break** --------------------------------------------------------------
 
 #' *BACI design*:
 #' - Before: start sampling before the treatment for a baseline
@@ -229,14 +318,14 @@ d_dist %>%
 
 #' model each site separately using `by` factor smooths
 m_dist_fe_1 <- bam(animals_per_km2 ~
-                    site + # fixed-effect intercept
-                    s(forest_perc, by = site) + # fixed-effect smooths
-                    s(elevation_m, by = site) +
-                    s(years, by = site),
-                  family = tw(link = 'log'),
-                  data = d_dist,
-                  method = 'fREML',
-                  discrete = TRUE)
+                     site + # fixed-effect intercept
+                     s(forest_perc, by = site) + # fixed-effect smooths
+                     s(elevation_m, by = site) +
+                     s(years, by = site),
+                   family = tw(link = 'log'),
+                   data = d_dist,
+                   method = 'fREML',
+                   discrete = TRUE)
 draw(m_dist_fe_1, scales = 'fixed')
 summary(m_dist_fe_1)
 # each site is modeled independently, so it's hard to say what the effects
@@ -245,14 +334,14 @@ summary(m_dist_fe_1)
 
 # use random effects for each site
 m_dist_re_1 <- bam(animals_per_km2 ~
-                    s(site, bs = 're') + # random intercept
-                    s(forest_perc, site, bs = 'fs') + # random smooths
-                    s(elevation_m, site, bs = 'fs') +
-                    s(years, site, bs = 'fs'),
-                  family = tw(link = 'log'),
-                  data = d_dist,
-                  method = 'fREML',
-                  discrete = TRUE)
+                     s(site, bs = 're') + # random intercept
+                     s(forest_perc, site, bs = 'fs') + # random smooths
+                     s(elevation_m, site, bs = 'fs') +
+                     s(years, site, bs = 'fs'),
+                   family = tw(link = 'log'),
+                   data = d_dist,
+                   method = 'fREML',
+                   discrete = TRUE)
 draw(m_dist_re_1, scales = 'fixed')
 summary(m_dist_re_1)
 # sites are modeled together, but we can't separate the disturbance effect
@@ -261,19 +350,19 @@ summary(m_dist_re_1)
 
 # use random effects for undisturbed/disturbed and untreated/treated
 m_dist_re_2 <- bam(animals_per_km2 ~
-                   # random intercepts
-                   s(site, bs = 're') +
-                   s(disturbed_fac, bs = 're') +
-                   s(treated_fac, bs = 're') +
-                   # random smooths
-                   s(forest_perc, by = site) +
-                   s(elevation_m, by = site) +
-                   s(years, disturbed_fac, bs = 'fs') +
-                   s(years, treated_fac, bs = 'fs'),
-                 family = tw(link = 'log'),
-                 data = d_dist,
-                 method = 'fREML',
-                 discrete = TRUE)
+                     # random intercepts
+                     s(site, bs = 're') +
+                     s(disturbed_fac, bs = 're') +
+                     s(treated_fac, bs = 're') +
+                     # random smooths
+                     s(forest_perc, by = site) +
+                     s(elevation_m, by = site) +
+                     s(years, disturbed_fac, bs = 'fs') +
+                     s(years, treated_fac, bs = 'fs'),
+                   family = tw(link = 'log'),
+                   data = d_dist,
+                   method = 'fREML',
+                   discrete = TRUE)
 draw(m_dist_re_2, scales = 'fixed')
 summary(m_dist_re_2)
 
@@ -313,19 +402,17 @@ summary(m_dist_fe_2)
 #' *note:* significance is approximate, and p-values are likely too small
 #' because they neglect smoothing parameter uncertainty.
 
-#' **move up to chick dataset:**
-#' - predicting out of sample (random effects)
-#' - forecasting (leveraging hierarchical structure)
-
-
 #' *extra work for those interested*
 #' repeat the analyses on significant rates of change from day 4 using the
 #' models and data for all three sites. Think carefully about what plots
 #' best convey the results and what terms you should predict for when
 #' creating the plots.
+#' 
+#' try applying the techniques I shared with you today to your data, even
+#' an analysis you ran in the past.
 
 #' *extra materials for those interested*
 #' - `https://peerj.com/articles/6876/`
 #' - `https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus`
 #' - `https://xcelab.net/rm/`
-#' 
+#' - `https://github.com/csc-ubc-okanagan/ubco-csc-modeling-workshop`
