@@ -299,8 +299,6 @@ d_ts %>%
 
 #' **break** --------------------------------------------------------------
 
-#' ========================================================================
-
 # part 2: introduction to (linear) trend detection (ANOVA, ANCOVA) ----
 d_1 <- gamSim(eg = 5, n = 100) %>% as_tibble()
 
@@ -545,14 +543,16 @@ plot_grid(draw(gam(co2_ppm ~ poly(season, 1), data = d_co2),
 #' Q: how does using linear models restrict you?
 #' Q: what would you do to overcome the models' limitations?
 
-#' `ChickWeight`: weight of chicks over time (0-21) eating 4 diets
-ChickWeight <- janitor::clean_names(ChickWeight) %>% as_tibble()
-ChickWeight
+#' `chick_weight`: mass (`weight`) of chicks over days since hatching
+#' (0 - 21) eating 4 diets with varying levels of protein
+chick_weight <- janitor::clean_names(ChickWeight) %>% as_tibble()
+chick_weight
 
-ggplot(ChickWeight, aes(time, weight, group = chick)) +
+ggplot(chick_weight, aes(time, weight, group = chick)) +
   facet_wrap(~ diet) +
   geom_line(alpha = 0.5) +
-  geom_point(alpha = 0.3)
+  geom_point(alpha = 0.3) +
+  labs(x = 'Days since hatching', y = 'Mass (g)')
 
 #' `CO2` (all uppercase; see `?CO2` for more info)
 #' dataset on CO2 uptake by plants (Cockspur grass; Echinochloa crus-galli)
