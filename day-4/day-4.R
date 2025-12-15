@@ -10,6 +10,7 @@ library('cowplot')   # for multi-panel plots
 library('khroma')    # for color palettes
 library('lubridate') # for working with dates
 source('functions/plot_acf.R') #' `ggplot2` version of `stats:::plot.acf()`
+source('functions/plot_pacf.R') #' `ggplot2` version of `stats:::plot.pacf()`
 theme_set(theme_bw())
 
 d_ouf <- read_csv('data/ouf-sim.csv', col_types = 'Ddd') %>%
@@ -111,9 +112,10 @@ draw(m_wiggly_tw, n = 500, residuals = TRUE)
 
 #' Q: is the model overfit? why or why not?
 
-#' *note:* there is still some autocorrelation in the residuals, but
-#'         removing it fully with the GAM alone risks over-fitting it
+#' *note:* there is still some autocorrelation in the residuals
+#'         see the `{mvgam}` package for dealing with autocorrelation in GAMs
 plot_acf(m_wiggly_tw)
+plot_pacf(m_wiggly_tw)
 
 #' still much better than `m_smooth` or `m_glm`
 plot_acf(m_smooth)

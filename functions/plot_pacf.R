@@ -1,7 +1,7 @@
 library('ggplot2')
 
-plot_acf <- function(.model, max_lag = 100) {
-  acf(resid(.model), plot = FALSE, lag.max = max_lag) %>%
+plot_pacf <- function(.model, max_lag = 100) {
+  pacf(resid(.model), plot = FALSE, lag.max = max_lag) %>%
     with(data.frame(lag = lag, acf = acf)) %>%
     ggplot() +
     annotate('rect', color = 4, fill = 4, alpha = 0.3,
