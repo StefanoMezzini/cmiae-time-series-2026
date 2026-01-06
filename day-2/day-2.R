@@ -240,15 +240,15 @@ appraise(m_gam, method = 'simulate', n_simulate = 100, point_alpha = 0.3)
 #' still interpretable, unlike "AI" (neural networks, etc.)
 
 #' *selecting model complexity*
-d_ouf <- readr::read_csv('data/ouf-sim.csv', show_col_types = FALSE) %>%
+d_conc <- readr::read_csv('data/conc-sim.csv', show_col_types = FALSE) %>%
   mutate(dec_date = lubridate::decimal_date(date))
-d_ouf
+d_conc
 
-ggplot(d_ouf, aes(date, compound_1)) + geom_point(alpha = 0.3)
+ggplot(d_conc, aes(date, conc)) + geom_point(alpha = 0.5)
 
 plot_k <- function(.k) {
-  .m <- gam(compound_1 ~ s(dec_date, k = .k, bs = 'cr'),
-            Gamma(link = 'log'), d_ouf, method = 'REML')
+  .m <- gam(conc ~ s(dec_date, k = .k, bs = 'cr'),
+            Gamma(link = 'log'), d_conc, method = 'REML')
   
   plot_grid(
     draw(.m, residuals = TRUE, n = 1e3) &
@@ -269,9 +269,9 @@ plot_k(20) #' increasing `k` allows more basis functions and wiggliness
 plot_k(100) #' high `k` allows for strong oscillations
 plot_k(200) #' very high `k` allows for small-scale oscillations
 
-# differences are not always substantial
-plot_k(20)
-plot_k(15)
+# differences are not always substantial in the final spline
+plot_k(150)
+plot_k(200)
 
 #' Q: how do you choose `k`?
 #' Q: how do you distinguish noise from signal?

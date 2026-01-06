@@ -565,13 +565,11 @@ ggplot(CO2, aes(conc, uptake, group = plant)) +
   geom_line() +
   geom_point(alpha = 0.3)
 
-#' `ouf_sim`: sample date along with concentrations of two compounds
-ouf_sim <- readr::read_csv('data/ouf-sim.csv', col_types = 'Ddd')
+#' `conc_sim`: concentration of a compounds over time
+conc_sim <- readr::read_csv('data/conc-sim.csv', col_types = 'Ddd')
 
-ouf_sim %>%
-  pivot_longer(! date) %>%
-  ggplot(aes(date, value)) +
-  facet_wrap(~ name, scale = 'free_y') +
+conc_sim %>%
+  ggplot(aes(date, conc)) +
   geom_line() +
   geom_point(alpha = 0.3) +
   geom_smooth(method ='lm', color = 'darkorange', fill = 'darkorange')

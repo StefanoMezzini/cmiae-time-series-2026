@@ -8,27 +8,33 @@ library('gratia')  #' for plotting GAMs and their diagnostics
 theme_set(theme_bw())
 
 # OUF simulation ----
-mm <- ctmm(tau = c(100, 3), isotropic = FALSE, mu = c(0, 0), sigma = 1)
+set.seed(50)
+d_sim <- tibble(date = as.Date('2023-05-07') + 1:1e3,
+                x = lubridate::decimal_date(date) - 2024) %>%
+  mutate(mu = (x * (x+1)^2 * (x-2)^3) / 3 + 3.5,
+         e = rnorm(length(date), sd = 0.1))
 
-ouf_sim <-
-  simulate(mm, t = 1:1e3) %>%
-  data.frame() %>%
-  as_tibble() %>%
-  transmute(date = as.Date('2023-05-07') + t,
-            compound_1 = (x - min(x) + 1) * 12,
-            compound_2 = (y - min(y) + 0.25) * 167)
+# add correlated trends
+for(i in 1:nrow(d_sim)) {
+  if(i > 1) {
+    d_sim$e[i] <- d_sim$e[i] + 0.5 * d_sim$e[i - 1]
+  }
+  if(i > 2) {
+    d_sim$e[i] <- d_sim$e[i] + 0.4 * d_sim$e[i - 2]
+  }
+}
 
-ggplot(ouf_sim, aes(compound_1, compound_2)) + geom_point()
+d_sim <- d_sim %>%
+  mutate(conc = exp(mu + e)) %>%
+  select(! c(x, e, mu))
 
-ouf_sim %>%
-  pivot_longer(! date) %>%
-  ggplot(aes(date, value)) +
-  facet_wrap(~ name, scale = 'free_y') +
-  geom_line() +
-  geom_point(alpha = 0.3)
+ggplot(d_sim, aes(date, conc)) + geom_point()
 
-write_csv(ouf_sim, file = 'data/ouf-sim.csv')
-read_csv('data/ouf-sim.csv', col_types = 'Ddd')
+plot(acf(d_sim$conc))
+plot(pacf(d_sim$conc))
+
+write_csv(d_sim, file = 'data/conc-sim.csv')
+read_csv('data/conc-sim.csv', col_types = 'Ddd')
 
 # simulated data for yers since disturbance ----
 set.seed(2)

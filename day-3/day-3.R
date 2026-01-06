@@ -243,23 +243,23 @@ plot_grid(plot_grid(p_year, p_doy, labels = 'AUTO', nrow = 1),
 #' There is no clear rule for deciding sampling frequency exactly, but you
 #' should aim to have (at least) a few samples for each period of interest,
 #' if possible. For example, if you want to estimate monthly levels of a
-#' certain compound, a measurement every month is ok, but multiple
-#' measurements per month is best.
-d_ouf <- readr::read_csv('data/ouf-sim.csv', col_types = 'Ddd') %>%
+#' certain compound, a measurement every month may be ok, but multiple
+#' measurements per month is often better.
+d_conc <- readr::read_csv('data/conc-sim.csv', col_types = 'Ddd') %>%
   mutate(month = paste(month.name[month(date)], year(date)),
          week = floor(as.numeric(date) / 7)) %>% # n 7-day periods since origin
-  mutate(monthly_mean = mean(compound_1), .by = month)
+  mutate(monthly_mean = mean(conc), .by = month)
 
 ## daily measurements
 # monthly time series and means
-ggplot(d_ouf, aes(date, compound_1)) +
+ggplot(d_conc, aes(date, conc)) +
   facet_wrap(~ month, scales = 'free') +
   geom_line(aes(date, monthly_mean), color = 'darkorange') +
   geom_line() +
   geom_point()
 
-# full time series
-ggplot(d_ouf, aes(date, compound_1)) +
+# full time series with monthly mean from full dataset
+ggplot(d_conc, aes(date, conc)) +
   geom_line() +
   geom_point(alpha = 0.3) +
   geom_line(aes(y = monthly_mean), color = 'darkorange', lwd = 1)
@@ -267,44 +267,44 @@ ggplot(d_ouf, aes(date, compound_1)) +
 ## weekly measurements
 # monthly time series and sample means
 # differences are present but not always alarming
-d_ouf %>%
+d_conc %>%
   slice(1, .by = week) %>%
-  mutate(sample_mean = mean(compound_1), .by = month) %>%
-  ggplot(aes(date, compound_1)) +
+  mutate(sample_mean = mean(conc), .by = month) %>%
+  ggplot(aes(date, conc)) +
   facet_wrap(~ month, scales = 'free') +
   geom_line(aes(date, monthly_mean), color = 'darkorange') +
   geom_line(aes(date, sample_mean), color = 'dodgerblue4') +
   geom_line() +
   geom_point()+
-  geom_point(data = d_ouf, alpha = 0.1)
+  geom_point(data = d_conc, alpha = 0.1)
 
-# thinned time series
-d_ouf %>%
+# thinned time series with monthly mean from full dataset
+d_conc %>%
   slice(1, .by = week) %>%
-  ggplot(aes(date, compound_1)) +
+  ggplot(aes(date, conc)) +
   geom_line(aes(y = monthly_mean), color = 'darkorange', lwd = 1) +
-  geom_line(data = d_ouf) +
+  geom_line(data = d_conc) +
   geom_point() +
-  geom_point(data = d_ouf, alpha = 0.1)
+  geom_point(data = d_conc, alpha = 0.1)
 
 ## monthly measurements
-# monthly samples: differences are quite prominent
-d_ouf %>%
+# differences can be quite prominent
+d_conc %>%
   slice(15, .by = month) %>%
-  ggplot(aes(date, compound_1)) +
+  ggplot(aes(date, conc)) +
   facet_wrap(~ month, scales = 'free') +
   geom_point(aes(date, monthly_mean), color = 'darkorange') +
-  geom_point(aes(date, compound_1), color = 'dodgerblue4') +
-  geom_point(data = d_ouf, alpha = 0.1)
+  geom_point(aes(date, conc), color = 'dodgerblue4') +
+  geom_point(data = d_conc, alpha = 0.1)
 
 # thinned time series
-d_ouf %>%
+d_conc %>%
   slice(15, .by = month) %>%
-  ggplot(aes(date, compound_1)) +
-  geom_line(aes(y = monthly_mean), d_ouf, color = 'darkorange', lwd = 1) +
+  ggplot(aes(date, conc)) +
+  geom_line(aes(y = monthly_mean), d_conc, color = 'darkorange', lwd = 1) +
   geom_line() +
   geom_point() +
-  geom_point(data = d_ouf, alpha = 0.1)
+  geom_point(data = d_conc, alpha = 0.1)
 
 #' multiple measurements per period of interest allows one to account for
 #' the noise in the data and separate it from the signal. one sample per
@@ -325,16 +325,6 @@ d_ouf %>%
 #'    variable (e.g., time, level of contamination, population density)?
 
 #' *if you want to learn more*
-#' I generated the `d_ouf` dataset via an Ornstein-Uhlenbeck Foraging (OUF)
-#' model (`https://doi.org/10.1086/675504`) that I created with the `ctmm`
-#' package (`https://doi.org/10.1111/2041-210X.12559`). More specifically,
-#' the `compound_1` and `compound_2` variables are simulated x and y
-#' coordinates for how animals move in space. The two are generated using
-#' a bivariate Gaussian distribution to generate samples from an underlying
-#' continuous-time trajectory.
-ggplot(d_ouf, aes(compound_1, compound_2)) +
-  geom_path()
-
 #' In the context of animal tracking, the manuscripts below address
 #' some issues that may be of interest. Although these references are
 #' specific to animal tracking, the ideas of sampling intensity apply to

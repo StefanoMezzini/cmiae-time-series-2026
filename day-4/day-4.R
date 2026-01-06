@@ -13,15 +13,15 @@ source('functions/plot_acf.R') #' `ggplot2` version of `stats:::plot.acf()`
 source('functions/plot_pacf.R') #' `ggplot2` version of `stats:::plot.pacf()`
 theme_set(theme_bw())
 
-d_ouf <- read_csv('data/ouf-sim.csv', col_types = 'Ddd') %>%
+d_sim <- read_csv('data/conc-sim.csv', col_types = 'Ddd') %>%
   mutate(dec_date = decimal_date(date),
          year = year(date),
          doy = yday(date))
 
 #' finding rates of change with LMs or GLMs is easy, but the models often
 #' don't fit well...
-m_glm <- gam(compound_1 ~ dec_date,
-             data = d_ouf,
+m_glm <- gam(conc ~ dec_date,
+             data = d_sim,
              family = Gamma(link = 'log'), # response is strictly positive
              method = 'REML')
 
@@ -29,29 +29,30 @@ m_glm <- gam(compound_1 ~ dec_date,
 draw(m_glm, parametric = TRUE)
 draw(m_glm, parametric = TRUE, ci_level = 0.001, ci_alpha = 0) # hide CIs
 
-summary(m_glm) #' slope is change after a year on the log scale
+summary(m_glm) #' slope is change after a year (on the log scale)
 coef(m_glm)
 exp(coef(m_glm)['dec_date']) # relative change every year
 
 #' you could subtract a value so that `x` it's a lower number
 #' (generally not ideal because it can cause confusion when predicting)
-m_glm_2 <- gam(compound_1 ~ I(dec_date - 2023),
-               data = d_ouf,
+m_glm_2 <- gam(conc ~ I(dec_date - 2023),
+               data = d_sim,
                family = Gamma(link = 'log'), # response is strictly positive
                method = 'REML')
 draw(m_glm_2, parametric = TRUE)
 summary(m_glm_2) # intercept is shifted, but slope is unchanged
+round(coef(m_glm), 5) == round(coef(m_glm_2), 5)
 
 # extract the fitted values (i.e., predictions) and plot them 
 fitted_values(m_glm, scale = 'response') %>%
   ggplot() +
   geom_ribbon(aes(dec_date, ymin = .lower_ci, ymax = .upper_ci),
               fill = 'darkorange', alpha = 0.3) +
-  geom_point(aes(dec_date, compound_1), d_ouf, alpha = 0.5) +
+  geom_point(aes(dec_date, conc), d_sim, alpha = 0.5) +
   geom_line(aes(dec_date, .fitted), color = 'darkorange', lwd = 1) +
-  labs(x = 'Year CE', y = 'Compound 1')
+  labs(x = 'Year CE', y = 'Concrentration')
 
-#' *note:* change is nonlinear: decrease to 70% every year 
+#' *note:* change is nonlinear: each year decreases to 78% of the previous year 
 
 # Q: the term is significant, but does it matter? Is this a good estimate?
 
@@ -61,8 +62,8 @@ fitted_values(m_glm, scale = 'response') %>%
 appraise(m_glm, point_alpha = 0.3)
 
 # model the data using a smooth term
-m_smooth <- gam(compound_1 ~ s(dec_date, k = 20),
-                data = d_ouf,
+m_smooth <- gam(conc ~ s(dec_date, k = 20),
+                data = d_sim,
                 family = Gamma(link = 'log'),
                 method = 'REML')
 
@@ -72,7 +73,7 @@ draw(m_smooth, n = 200, residuals = TRUE)
 #' `(Intercept)` is now the average response across the smooth term
 summary(m_smooth)
 exp(coef(m_smooth)['(Intercept)'])
-mean(d_ouf$compound_1) #' *note:* `mean(s(dec_date)) != mean(compound_1)`
+mean(d_sim$conc) #' *note:* `mean(s(dec_date)) != mean(conc)`
 
 # diagnostics are not great but better than the GLM
 appraise(m_smooth, point_alpha = 0.3)
@@ -81,45 +82,34 @@ appraise(m_smooth, point_alpha = 0.3)
 
 # model the data using a very wiggly smooth term
 # as the smooth gets more wiggly, errors get smaller
-m_wiggly <- gam(compound_1 ~ s(dec_date, k = 150),
-                data = d_ouf,
+m_wiggly <- gam(conc ~ s(dec_date, k = 150),
+                data = d_sim,
                 family = Gamma(link = 'log'),
                 method = 'REML')
 draw(m_wiggly, n = 500, residuals = TRUE)
 
-# diagnostics are better, but mean-variance relationship is wrong:
-# middle quantiles are too concentrated
+# right-side plots are better
 appraise(m_wiggly, point_alpha = 0.3)
-
-# re-fit with Tweedie family
-m_wiggly_tw <- gam(compound_1 ~ s(dec_date, k = 150),
-                   data = d_ouf,
-                   family = tw(link = 'log'),
-                   method = 'REML')
-
-# diagnostics look reasonable now
-#' specifying `n_simulate` because `method = 'uniform'` is not available
-#' increase `n_simulate` for more accurate intervals
-appraise(m_wiggly_tw, point_alpha = 0.3, n_simulate = 10)
-
-#' estimated mean is essentially identical to the Gamma model...
-draw(m_wiggly_tw, n = 500, residuals = TRUE)
-
-#' ... but the mean-variance relationship is different
-#' Gamma variance is `phi * mu^2`
-#' Tweedie variance is `phi * mu^p` for `p` in `(1, 2)`
-#' the model has `p = 1.01`, so the variance is approximately `phi * mu`
 
 #' Q: is the model overfit? why or why not?
 
 #' *note:* there is still some autocorrelation in the residuals
 #'         see the `{mvgam}` package for dealing with autocorrelation in GAMs
-plot_acf(m_wiggly_tw)
-plot_pacf(m_wiggly_tw)
-
 #' still much better than `m_smooth` or `m_glm`
-plot_acf(m_smooth)
-plot_acf(m_glm)
+plot_grid(plot_acf(m_wiggly) + ggtitle('Wiggly GAM'),
+          plot_acf(m_smooth) + ggtitle('Smooth GAM'),
+          plot_acf(m_glm) + ggtitle('GLM'),
+          nrow = 1)
+
+plot_grid(plot_pacf(m_wiggly) + ggtitle('Wiggly GAM'),
+          plot_pacf(m_smooth) + ggtitle('Smooth GAM'),
+          plot_pacf(m_glm) + ggtitle('GLM'),
+          nrow = 1)
+
+#' the coefficient estimates from the smooth GAM are closes to the model used
+#' to generate the data, but whether the model is over-fit depends on how you
+#' plan to use it. do you want to simply interpolate across the data points, or
+#' are you trying to estimate the true underlying process?
 
 #' **break** --------------------------------------------------------------
 
@@ -139,26 +129,26 @@ plot_acf(m_glm)
 lvl <- 0.999 # using 99.9% CIs
 
 slopes_smooth <- bind_cols(
-  d_ouf,
+  d_sim,
   #' slopes with CIs for across the function: *simultaneous, not pointwise*
-  derivatives(m_smooth, data = d_ouf, interval = 'simultaneous', level = lvl) %>%
+  derivatives(m_smooth, data = d_sim, interval = 'simultaneous', level = lvl) %>%
     transmute(est_deriv = .derivative,
               lwr_deriv = .lower_ci,
               upr_deriv = .upper_ci),
   # add smooth estimates on link scale
-  smooth_estimates(m_smooth, data = d_ouf, select = 's(dec_date)',
+  smooth_estimates(m_smooth, data = d_sim, select = 's(dec_date)',
                    overall_uncertainty = FALSE, ci_level = lvl) %>%
     add_confint(coverage = lvl) %>%
     transmute(est_smooth = .estimate,
               lwr_smooth = .lower_ci,
               upr_smooth = .upper_ci),
   # add fitted values on link scale
-  fitted_values(m_smooth, data = d_ouf, scale = 'link', ci_level = lvl) %>%
+  fitted_values(m_smooth, data = d_sim, scale = 'link', ci_level = lvl) %>%
     transmute(est_link = .fitted,
               lwr_link = .lower_ci,
               upr_link = .upper_ci),
   # add fitted values on response scale
-  fitted_values(m_smooth, data = d_ouf, scale = 'response', ci_level = lvl) %>%
+  fitted_values(m_smooth, data = d_sim, scale = 'response', ci_level = lvl) %>%
     transmute(est_resp = .fitted,
               lwr_resp = .lower_ci,
               upr_resp = .upper_ci)) %>%
@@ -183,17 +173,14 @@ slopes_smooth <- bind_cols(
                     'Fitted (response scale)')))
 
 # plot smooths and derivatives with direction of change
-ref_lines <- tibble(yint = c(0, 0, coef(m_smooth)['(Intercept)'],
-                             exp(coef(m_smooth)['(Intercept)'])),
-                    parameter = unique(slopes_smooth$parameter))
-
 ggplot(slopes_smooth) +
   facet_grid(parameter ~ ., scales = 'free_y') +
-  geom_hline(aes(yintercept = yint), ref_lines, lty = 'dashed') +
+  geom_hline(aes(yintercept = yint),
+             tibble(yint = 0, parameter = 'Derivative'), lty = 'dashed') +
   geom_ribbon(aes(dec_date, ymin = lwr, ymax = upr), alpha = 0.2) +
   geom_line(aes(dec_date, est, color = direction, group = 1),
             linewidth = 1.5) +
-  labs(x = 'Year CE', y = 'Compound 1') +
+  labs(x = 'Year CE', y = 'Concrentration') +
   scale_color_brewer(name = 'Direction of change', type = 'qual',
                      palette = 6) +
   theme(legend.position = 'top')
@@ -209,7 +196,7 @@ ggplot(slopes_smooth) +
   geom_line(aes(dec_date, est, color = direction, group = group),
             data = filter(slopes_smooth, significant),
             linewidth = 1.5) +
-  labs(x = 'Year CE', y = 'Compound 1') +
+  labs(x = 'Year CE', y = 'Concrentration') +
   scale_color_brewer(name = 'Direction of change', type = 'qual',
                      palette = 6) +
   theme(legend.position = 'top')
