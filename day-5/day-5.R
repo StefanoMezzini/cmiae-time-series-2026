@@ -402,6 +402,10 @@ summary(m_dist_fe_2)
 #' *note:* significance is approximate, and p-values are likely too small
 #' because they neglect smoothing parameter uncertainty.
 
+#' **********************************************************************
+#' *download the course material: will be deleted over the next few days*
+#' **********************************************************************
+
 #' *extra work for those interested*
 #' repeat the analyses on significant rates of change from day 4 using the
 #' models and data for all three sites. Think carefully about what plots
