@@ -179,7 +179,7 @@ densities_hyp_testing <-
   mutate(group = case_when(mass_kg < lower_ci - sample_mean + 12 ~ 'left',
                            mass_kg < upper_ci - sample_mean + 12 ~ 'center',
                            mass_kg >= upper_ci - sample_mean + 12 ~ 'right'),
-         h_0_density = dt((mass_kg - 12) / (sigma / sqrt(11)), 11 - 1))
+         h_0_density = dt((mass_kg - 12) / sample_se, 11 - 1))
 
 # two-sided p-values and CIs
 ggplot() +
