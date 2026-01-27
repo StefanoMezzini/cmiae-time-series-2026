@@ -256,7 +256,7 @@ expand_grid(imprecision = c(0, 5),
 #' Q: how does this affect your interpretation of hypothesis testing?
 
 #' *dealing with missing data*
-#' substitute missing data with averages:
+#' substituting missing data with averages:
 #' - biases estimates towards the (random) sample average
 #' - is not good practice
 
@@ -565,7 +565,7 @@ ggplot(CO2, aes(conc, uptake, group = plant)) +
   geom_line() +
   geom_point(alpha = 0.3)
 
-#' `conc_sim`: concentration of a compounds over time
+#' `conc_sim`: concentration of a compound over time
 conc_sim <- readr::read_csv('data/conc-sim.csv', col_types = 'Ddd')
 
 conc_sim %>%
