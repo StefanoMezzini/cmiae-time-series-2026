@@ -3,6 +3,13 @@
 #' before we start...
 #' run `necessary-packages.R` to install all the packages we'll use
 #' 
+#' *change some settings*
+#' Tools > Global Options:
+#' - uncheck "restore data"
+#' - change "save workspace" to "never"
+#' - optional: edit RStudio theme
+#' - optional: add custom theme: "Black-Rmd.rstheme"
+#' 
 #' Q: how many have *not* used `R` much before?
 #' Q: how many have *not* used functional programming (e.g., `apply()`)?
 #' Q: how many are *not* used to `tidyverse` syntax (`%>%`, etc.)?
@@ -22,7 +29,7 @@ theme_set(theme_bw())
 # part 1: review of core statistical concepts ----
 #' *populations*
 #' imagine all individuals of species "X" within a given period of time.
-#' let the population of all masses have a mean `mu` and variance `sigma`:
+#' let the population of all masses have a mean `mu` and standard deviation `sigma`:
 mu <- 14.5 # true mean
 sigma <- 2.2 # true standard deviation
 densities <- tibble(mass_kg = seq(0, 30, length.out = 1e3),
@@ -87,7 +94,7 @@ p_sds
 # sample statistics are estimates of the population statistics:
 #' - sample mean is an estimate of `mu`, called `x_bar` or `mu_hat`
 #' - sample SD is an estimate of `sigma`, called `s` or `s_hat`
-#' - sample var is an estimate of `mu`, called `s2` or `sigma2_hat`
+#' - sample var is an estimate of `sigma^2`, called `s2` or `sigma2_hat`
 # but there is randomness in the estimation process
 # distribution of the 12 sample means
 ggplot(sample_summaries) +
@@ -124,7 +131,7 @@ sample_summaries <- sample_summaries %>%
 
 sample_summaries # sample SEs are different across samples
 
-# distribution of the 12 sample variances
+# distribution of the 12 sample SEs
 ggplot(sample_summaries) +
   geom_histogram(aes(sample_se), binwidth = 0.075, color = 'black',
                  fill = 'grey') +
@@ -137,8 +144,8 @@ ggplot(sample_summaries) +
 #' for example, animals from another population have a known mean of 12 kg.
 #' does this population have a different mean?
 #' if so, we would data to be consistent with this hypothesis
-#' indicate the null hypothesis as H_0: `mu_0` = 12 kg
-#' the alternative hypothesis could be H_a: `mu` != 12 kg
+#' indicate the null hypothesis as H_0: `mu = mu_0 = 12 kg`
+#' the alternative hypothesis could be H_a: `mu != 12 kg`
 #' *Note:*
 #' - we are not trying to estimate the parameters
 #' - we are checking if the data are consistent with H_0
@@ -420,7 +427,7 @@ p_preds_co2
 #' *limitations of linear models*
 appraise(lm_co2) # see nonlinear trends in residuals vs linear predictors
 
-#' *polynomial models* can estimate some "nonlinear" trents
+#' *polynomial models* can estimate some "nonlinear" trends
 #' *NOTE:* still actually linear because the models are sums of products:
 #'  `mu = b0 + b1 * x1 + b2 * (x1)^2 = b0 + b1 * x1 + b2 * x2`
 lm_co2_poly <- gam(formula = co2_ppm ~ poly(dec_date, 2),
