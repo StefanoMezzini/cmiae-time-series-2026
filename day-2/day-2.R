@@ -165,7 +165,7 @@ plot_preds <- function(.model) {
 # does not follow the data well
 plot_preds(m_lm)
 
-# gives impossible predictions (negative weight 3-5 days before hatching)
+# gives impossible predictions (negative weight 4-5 days before hatching)
 fitted_values(m_lm, data = tibble(time = -5:0))
 
 #' *Gamma GLM fits better*
@@ -276,7 +276,7 @@ plot_k(200)
 #' Q: how do you choose `k`?
 #' Q: how do you distinguish noise from signal?
 
-#' *modeling seasonal and daily trends*
+#' *modeling seasonal and yearly trends*
 d_co2 <- tibble(dec_date = as.vector(time(co2)),
                 year = floor(dec_date),
                 season = dec_date - year,
@@ -285,13 +285,14 @@ d_co2
 
 ggplot(d_co2, aes(dec_date, co2_ppm)) + geom_point(alpha = 0.3)
 
-m_co2 <- gam(co2_ppm ~ s(year, k = 10) + s(season, bs = 'cc', k = 10),
+m_co2 <- gam(co2_ppm ~ s(year, k = 10) +
+               s(season, bs = 'cc', k = 10), # cyclic cubic splines
              data = d_co2, family = Gamma(link = 'log'), method = 'REML',
              knots = list(season = c(0, 1))) # force 0 and 1 to match
 draw(m_co2)
 
 #' reducing `k` too much can result in excessively rigid smooths
-gam(co2_ppm ~ s(year, k = 10) + s(season, bs = 'cc', k = 10),
+gam(co2_ppm ~ s(year, k = 10) + s(season, bs = 'cc', k = 5),
     data = d_co2, family = Gamma(link = 'log'), method = 'REML',
     knots = list(season = c(0, 1))) %>%
   draw()
@@ -320,7 +321,7 @@ appraise(m_co2, method = 'simulate', point_alpha = 0.3)
 #' Q: think of some common datasets you use. what distributions would you
 #'    use to model the response variable? are there any datasets for which
 #'    more than one distribution may be appropriate?
-#' Q: look at the wikipedia page for some of those distribution. what are
+#' Q: look at the wikipedia page for some of those distributions. what are
 #'    the relationships between the mean and the variance? are the two
 #'    independent, or can you write the variance as a function of the mean?
 #' Q: does the relationship make biological sense?
