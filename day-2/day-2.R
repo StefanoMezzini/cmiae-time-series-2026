@@ -49,7 +49,7 @@ ggplot() +
 exp(mean(log(pois_sample)))
 
 # always true (unless all values in the sample are the same...)
-exp(mean(log(rpois(100, lambda = 10)))) < mean(pois_sample)
+exp(mean(log(pois_sample))) < mean(pois_sample)
 
 ggplot() +
   geom_histogram(aes(log(pois_sample)), bins = 7,
