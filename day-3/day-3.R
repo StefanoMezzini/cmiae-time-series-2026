@@ -40,13 +40,13 @@ summary(m_co2)
 #' `Family: Gamma`: `y` is assumed to be *conditionally* Gamma-distributed
 #' `Formula`: model formula
 #' `Parametric coefficients`: table for intercept & slope coefficients
-#' `(Intercept)`: `co2_ppm` averaged across all smooth the functions and
+#' `(Intercept)`: `co2_ppm` averaged across all the smooth functions and
 #'                setting all other parametric terms to 0
 #'  other coefficients: slopes of any parametric terms (i.e., not smooths)
 #' `s(year)`: the smooth effect of `year` for the average `s(season)`
 #' `ti(year,season)`: change in `s(year)` across `s(season)` and vice-versa
 #' 
-#' `edf`: effective degrees of freedom; measures the complexity of smooth
+#' `edf`: estimated degrees of freedom; measures the complexity of smooth
 #' `Ref.df`: reference degrees of freedom for F test
 #' `F`: F statistic for F test
 #' `p-value`: p-value from the F test
@@ -88,8 +88,8 @@ predict(m_co2, newdata = new_d, type = 'response', terms = 's(year)')
 
 #' exclude specific terms by specifying `exclude` argument
 #' e.g., `exclude = 's(year)'`:
-#' - excludes `(Intercept)`
-#' - sets `s(season) = ti(year,season) = 0`
+#' - sets `s(year) = 0`, so `exp(s(year)) = exp(0) = 1`
+#' - includes `(Intercept)`, `s(season)`, and `ti(year,season)`
 predict(m_co2, newdata = new_d, type = 'link',
         exclude = c('(Intercept)', 's(season)', 'ti(year,season)'))
 
@@ -118,7 +118,7 @@ tibble(year = seq(1959, 1997, length.out = 400),
   labs(x = 'Year CE',
        y = expression(CO[2]~concentration~(ppm)))
 
-# change over the years, ignoring seasonal trends
+# change over the years, including seasonal trends
 preds_full <- tibble(year = seq(1959, 1997 - 0.001, by = 0.001),
                      season = year - floor(year)) %>%
   mutate(mu_hat = predict(m_co2, newdata = ., type = 'response'))
@@ -148,7 +148,7 @@ ggplot(preds_full) +
 
 #' add confidence intervals using `gratia::fitted_values()`
 new_d_year <- tibble(year = seq(1959, 1997, by = 0.001), season = 0)
-fitted_values(m_co2, data = new_d_year)
+fitted_values(m_co2, data = new_d_year, ci_level = 0.999)
 
 # add confidence intervals manually
 dof <- m_co2$df.residual
@@ -212,6 +212,7 @@ p_doy <-
   geom_ribbon(aes(doy, ymin = lower_95_ci, ymax = upper_95_ci),
               alpha = 0.3) +
   geom_line(aes(doy, mu_hat)) +
+  #' avoid spaces on the edges using `expand`
   scale_x_continuous('Day of year', expand = c(0, 0)) +
   ylab(expression(CO[2]~concentration~(ppm)))
 p_doy
@@ -221,22 +222,24 @@ p_ti <-
               season = seq(0, 1, length.out = 400)) %>%
   mutate(doy = season * 365) %>%
   mutate(rel_change = predict(m_co2, ., type = 'response', se.fit = FALSE,
-                    terms = c('(Intercept)', 'ti(year,season)')) %>%
-              as.numeric(), #' `predict()` returns array: make vector
-         percent_change = (rel_change - exp(coef(m_co2)['(Intercept)'])) * 100) %>%
+                              terms = 'ti(year,season)') %>%
+           as.numeric(),
+         percent_change = (rel_change - 1) * 100) %>% #' `predict()` returns array: make vector
   ggplot() +
   geom_raster(aes(doy, year, fill = percent_change)) +
   scale_x_continuous('Day of year', expand = c(0, 0)) +
   scale_y_continuous('Year CE', expand = c(0, 0)) +
-  scale_fill_vik(name = expression(atop(Change~'in'~seasonal~trend,
-                                        'in'~CO[2]~concentration~(ppm))),
-                 midpoint = 0, limits = c(-8, 8)) +
+  scale_fill_vik(name = expression(atop(Relative~change~'in'~CO[2],
+                                        concentration~('%'))),
+                 midpoint = 0, limits = c(-0.025, 0.025)) +
   theme(legend.position = 'top', legend.key.width = rel(2))
 p_ti
 
 # add all plots together
 plot_grid(plot_grid(p_year, p_doy, labels = 'AUTO', nrow = 1),
           p_ti, labels = c('', 'C'), ncol = 1)
+
+#' **break**
 
 #' *deciding sampling frequency before data collection*
 
@@ -315,7 +318,7 @@ d_conc %>%
 #'   of your datasets using the families you explored in the questions
 #'   from day 2. try changing the values of `k`, and maybe exploring the
 #'   different types of bases -- see `?mgcv::smooth.terms` for more info.
-#' Q: what happens if you set `k` below the number of unique values of the
+#' Q: what happens if you set `k` above the number of unique values of the
 #'    predictor variable? why do you think this happens?
 #' - try creating some figures for the models. can you think of scenarios
 #'   where you may want to exclude terms from the predictions? when could
