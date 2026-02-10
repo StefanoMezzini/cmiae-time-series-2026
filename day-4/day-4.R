@@ -95,6 +95,7 @@ appraise(m_wiggly, point_alpha = 0.3)
 
 #' *note:* there is still some autocorrelation in the residuals
 #'         see the `{mvgam}` package for dealing with autocorrelation in GAMs
+#'         `physalia-courses.org/courses-workshops/time-series-in-r/`
 #' still much better than `m_smooth` or `m_glm`
 plot_grid(plot_acf(m_wiggly) + ggtitle('Wiggly GAM'),
           plot_acf(m_smooth) + ggtitle('Smooth GAM'),
