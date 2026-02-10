@@ -187,8 +187,6 @@ layout(1)
 
 appraise(m_glm, method = 'simulate', n_simulate = 100, point_alpha = 0.3)
 
-plot_preds(m_glm) # estimated line is too high initially and at the end
-
 #' *check that assumptions are met*
 #' 1. Gaussian residuals on the link scale: e ~ N(0, sigma^2)
 #' 2. constant scale parameter (constant variance on link scale)
@@ -202,6 +200,8 @@ plot_preds(m_glm) # estimated line is too high initially and at the end
 #' *obs vs fitted* (3, 4): points should fall near 1:1 line
 
 # Q: how would you interpret the diagnostic plots?
+
+plot_preds(m_glm) # estimated line is too high initially and at the end
 
 #' *limitations of GLMs*
 # - cannot account for nonlinear trends
