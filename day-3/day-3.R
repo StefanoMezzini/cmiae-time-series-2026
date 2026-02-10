@@ -219,14 +219,15 @@ p_doy <-
   ylab(expression(CO[2]~concentration~(ppm)))
 p_doy
 
-p_ti <-
+# relative change in CO2 (%)
+p_ti_rel <-
   expand_grid(year = seq(1959, 1997, length.out = 400),
               season = seq(0, 1, length.out = 400)) %>%
   mutate(doy = season * 365) %>%
   mutate(rel_change = predict(m_co2, ., type = 'response', se.fit = FALSE,
                               terms = 'ti(year,season)') %>%
-           as.numeric(),
-         percent_change = (rel_change - 1) * 100) %>% #' `predict()` returns array: make vector
+           as.numeric(), #' `predict()` returns array: make vector
+         percent_change = (rel_change - 1) * 100) %>%
   ggplot() +
   geom_raster(aes(doy, year, fill = percent_change)) +
   scale_x_continuous('Day of year', expand = c(0, 0)) +
@@ -235,11 +236,33 @@ p_ti <-
                                         concentration~('%'))),
                  midpoint = 0, limits = c(-0.025, 0.025)) +
   theme(legend.position = 'top', legend.key.width = rel(2))
+p_ti_rel
+
+# change in CO2 (ppm)
+p_ti <-
+  expand_grid(year = seq(1959, 1997, length.out = 400),
+              season = seq(0, 1, length.out = 400)) %>%
+  mutate(doy = season * 365) %>%
+  mutate(mu_hat = predict(m_co2, newdata = ., type = 'response', se.fit = FALSE,
+                          terms = c('(Intercept)', 'ti(year,season)')) %>%
+           as.numeric(),
+         change = mu_hat - exp(coef(m_co2)['(Intercept)'])) %>%
+  ggplot() +
+  geom_raster(aes(doy, year, fill = change)) +
+  geom_contour(aes(doy, year, z = change), color = 'black') +
+  scale_x_continuous('Day of year', expand = c(0, 0)) +
+  scale_y_continuous('Year CE', expand = c(0, 0)) +
+  scale_fill_vik(name = expression(Change~'in'~CO[2]~concentration~(ppm)~'   '),
+                 midpoint = 0, limits = c(-0.08, 0.08)) +
+  theme(legend.position = 'top', legend.key.width = rel(2))
 p_ti
 
 # add all plots together
 plot_grid(plot_grid(p_year, p_doy, labels = 'AUTO', nrow = 1),
-          p_ti, labels = c('', 'C'), ncol = 1)
+          p_ti, labels = c('', 'C'), ncol = 1, rel_heights = c(1, 1.5))
+
+ggsave('co2-plot.png', path = 'day-3', width = 10, height = 7.7, units = 'in',
+       dpi = 300, bg = 'white')
 
 #' **break**
 
