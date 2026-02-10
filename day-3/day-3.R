@@ -37,7 +37,7 @@ draw(m_co2)
 #' *interpreting model summary*
 summary(m_co2)
 
-#' `Family: Gamma`: `y` is assumed to be *conditionally* Gamma-distributed
+#' `Family: Gamma`: `co2_ppm` is assumed to be *conditionally* Gamma-distributed
 #' `Formula`: model formula
 #' `Parametric coefficients`: table for intercept & slope coefficients
 #' `(Intercept)`: `co2_ppm` averaged across all the smooth functions and
@@ -87,11 +87,13 @@ predict(m_co2, newdata = new_d, type = 'link', terms = 's(year)')
 predict(m_co2, newdata = new_d, type = 'response', terms = 's(year)')
 
 #' exclude specific terms by specifying `exclude` argument
-#' e.g., `exclude = 's(year)'`:
-#' - sets `s(year) = 0`, so `exp(s(year)) = exp(0) = 1`
-#' - includes `(Intercept)`, `s(season)`, and `ti(year,season)`
+#' e.g., `exclude = c('(Intercept)', 's(season)', 'ti(year,season)')`:
+#' - sets `(Intercept)`, `s(season)`, `ti(year,season)`, so that
+#' `exp(s(year))` is centered at `exp(0) = 1`
 predict(m_co2, newdata = new_d, type = 'link',
         exclude = c('(Intercept)', 's(season)', 'ti(year,season)'))
+
+predict(m_co2, newdata = new_d, type = 'link', exclude = c('s(year)'))
 
 #' **break** --------------------------------------------------------------
 
