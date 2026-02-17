@@ -69,6 +69,7 @@ m_smooth <- gam(conc ~ s(dec_date, k = 20),
 
 #' *note:* `s(dec_date)` is centered at 0
 draw(m_smooth, n = 200, residuals = TRUE)
+draw(basis(m_smooth))
 
 #' `(Intercept)` is now the average response across the smooth term
 summary(m_smooth)
@@ -87,6 +88,7 @@ m_wiggly <- gam(conc ~ s(dec_date, k = 150),
                 family = Gamma(link = 'log'),
                 method = 'REML')
 draw(m_wiggly, n = 500, residuals = TRUE)
+draw(basis(m_wiggly))
 
 # right-side plots are better
 appraise(m_wiggly, point_alpha = 0.3)
@@ -116,12 +118,12 @@ plot_grid(plot_pacf(m_wiggly) + ggtitle('Wiggly GAM'),
 
 #' *an important note on credible intervals* 
 #' *pointwise* credible intervals:
-#' - at *individual* `years`, `P(true function in CI) = 1 - alpha`
-#' - if values across `s(years)` are independent, ~95% of should be in CI
+#' - at *individual* `dec_date`s, `P(true function in CI) = 1 - alpha`
+#' - if values across `s(dec_date)` are independent, ~95% of should be in CI
 #' - are approximately across-the-function Frequentist confidence intervals
 #' *simultaneous* credible intervals:
-#' - across *all* `years`, `P(true function in CI) = 1 - alpha`
-#' - values across `s(years)` are not assumed to be independent
+#' - across *all* `dec_date`, `P(true function in CI) = 1 - alpha`
+#' - values across `s(dec_date)` are not assumed to be independent
 #' - the CI contains the true function with probability `1 - alpha`
 
 #' *detecting periods of statistically significant change*
@@ -203,7 +205,7 @@ ggplot(slopes_smooth) +
   theme(legend.position = 'top')
 
 #' *choosing how many years to monitor*
-#' - >= 3 samples per period (see `day3.R`)
+#' - >= 3 samples per period (see `day-3.R`)
 #' - sample length should depend on the decay of the signal
 #' - duration should be longer than the expected time before change,
 #'   especially if you are interested in more than just mean conditions,
@@ -340,7 +342,7 @@ ggplot(samples) +
 
 #' *estimating probability of the mean surpassing a threshold*
 # simulate many (>= 1e4) draws from the posterior of the estimated mean
-means <- add_fitted_samples(new_d_dist, m_dist, n = 1e4,
+means <- add_fitted_samples(new_d_dist, m_dist, n = 1e3,
                             unconditional = TRUE)
 
 # find how many samples exceed the threshold
@@ -375,13 +377,14 @@ m_dist_ti <-
   gam(animals_per_km2 ~ s(forest_perc) + s(elevation_m) + s(years) +
         ti(forest_perc, years), # interaction between forest_perc and years
       family = tw(link = 'log'), data = d_dist, method = 'REML')
+draw(m_dist_ti)
 
 new_d_dist_2 <- data_slice(m_dist_ti,
-                           years = evenly(years, 100),
-                           forest_perc = evenly(forest_perc, 100))
+                           years = evenly(years, 50),
+                           forest_perc = evenly(forest_perc, 50))
 
 means_summary_ti <-
-  add_fitted_samples(new_d_dist_2, m_dist_ti, n = 500, # for a fast example
+  add_fitted_samples(new_d_dist_2, m_dist_ti, n = 100, # for a fast example
                      unconditional = TRUE) %>%
   summarize(years = unique(years),
             forest_perc = unique(forest_perc),
@@ -408,7 +411,7 @@ ggplot(means_summary_ti) +
                        direction = 1)
 
 #' *estimating probability of the data surpassing a threshold*
-posterior_samples <- add_posterior_samples(new_d_dist, m_dist, n = 1e4,
+posterior_samples <- add_posterior_samples(new_d_dist, m_dist, n = 1e3,
                                            unconditional = TRUE)
 
 # hex plot of probability density of the data
@@ -436,7 +439,7 @@ posterior_samples %>%
 #' *estimating probability of surpassing a threshold (rate of change)*
 #' note: other variables are kept constant with `focal = 'years'`
 slopes <- derivative_samples(m_dist, focal = 'years', data = new_d_dist,
-                             n_sim = 1e4)
+                             n_sim = 1e3)
 
 ggplot(filter(slopes, .draw <= 100)) +
   geom_hline(yintercept = 0, lty = 'dashed') +
@@ -462,7 +465,7 @@ slopes %>%
   # estimated mean from the simulated draws
   geom_line(aes(years, est_slope, color = p_above_0.5), linewidth = 1.5) +
   labs(x = 'Years after disturbance', y = density_lab) +
-  scale_color_distiller('P(Slope > 0.5', palette = 14, direction = 1)
+  scale_color_distiller('P(Slope > 0.5)', palette = 14, direction = 1)
 
 #' *predicting beyond the range of available data*
 # we have seen that GAMs are quite efficient at interpolating smoothly 
