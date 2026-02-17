@@ -33,7 +33,7 @@ summary(m_glm) #' slope is change after a year (on the log scale)
 coef(m_glm)
 exp(coef(m_glm)['dec_date']) # relative change every year
 
-#' you could subtract a value so that `x` it's a lower number
+#' you could subtract a value so that `x` is a lower number
 #' (generally not ideal because it can cause confusion when predicting)
 m_glm_2 <- gam(conc ~ I(dec_date - 2023),
                data = d_sim,
