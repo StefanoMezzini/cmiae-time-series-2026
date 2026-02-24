@@ -133,7 +133,7 @@ m_cw_5 <- bam(weight ~
               data = chick_weight,
               method = 'fREML',
               discrete = TRUE)
-draw(m_cw_5) # independent smooth terms are not linear
+draw(m_cw_5, parametric = TRUE) # independent smooth terms are not linear
 appraise(m_cw_5, point_alpha = 0.3) # residuals are still underdispersed
 
 #' there are many different types of models you can set up:
@@ -142,7 +142,8 @@ appraise(m_cw_5, point_alpha = 0.3) # residuals are still underdispersed
 
 # change family to Tweedie
 m_cw_tw <-
-  bam(weight ~ diet + s(time, by = diet, k = 5) + s(time, chick, bs = 'fs', k = 5), 
+  bam(weight ~ diet + s(time, by = diet, k = 5) +
+        s(time, chick, bs = 'fs', k = 5), 
       family = tw(link = 'log'), # to account for underdispersion
       data = chick_weight,
       method = 'fREML',
@@ -175,7 +176,17 @@ draw(m_cw_tw_2, dist = 1)
 #' a flatter growth curve than the marginal smooth of `s(time)`, while
 #' chicks with more protein have a steeper growth curve.
 
+expand_grid(time = 0:21,
+            protein_percent = 0:40,
+            chick = 'new chick') %>%
+  add_fitted(m_cw_tw_2) %>%
+  ggplot() +
+  geom_raster(aes(time, protein_percent, fill = .fitted)) +
+  geom_contour(aes(time, protein_percent, z = .fitted), color = 'black') +
+  scale_fill_distiller('Mass (g)', type = 'seq', palette = 1)
+
 #' **break** --------------------------------------------------------------
+dev.off()
 rm(m_cw_0, m_cw_1, m_cw_2, m_cw_3, m_cw_4, m_cw_5)
 gc()
 
@@ -284,7 +295,6 @@ chick_weight_short %>%
 #' expected to start growing faster despite having being removed from the
 #' experiment (likely due to poor health)
 
-#' **break** --------------------------------------------------------------
 rm(list = ls())
 dev.off()
 gc()
@@ -426,3 +436,4 @@ summary(m_dist_fe_2)
 #' - `https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus`
 #' - `https://xcelab.net/rm/`
 #' - `https://github.com/csc-ubc-okanagan/ubco-csc-modeling-workshop`
+#' 
