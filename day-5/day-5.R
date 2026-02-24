@@ -133,20 +133,21 @@ m_cw_5 <- bam(weight ~
               data = chick_weight,
               method = 'fREML',
               discrete = TRUE)
-draw(m_cw_5) # diet smooths were shrunken to linear terms
+draw(m_cw_5) # independent smooth terms are not linear
 appraise(m_cw_5, point_alpha = 0.3) # residuals are still underdispersed
 
 #' there are many different types of models you can set up:
 #' see figures 2 and 4 of `https://peerj.com/articles/6876/`
 #' the `diet` intercept could even be a RE, even if the smooth is `by` diet
 
-# add a global smooth
+# change family to Tweedie
 m_cw_tw <-
-  bam(weight ~ diet + s(time, by = diet) + s(time, chick, bs = 'fs'), 
+  bam(weight ~ diet + s(time, by = diet, k = 5) + s(time, chick, bs = 'fs', k = 5), 
       family = tw(link = 'log'), # to account for underdispersion
       data = chick_weight,
       method = 'fREML',
-      discrete = TRUE)
+      discrete = TRUE,
+      control = list(trace = TRUE)) # to see progress updates
 draw(m_cw_tw)
 appraise(m_cw_tw, point_alpha = 0.3) # QQ plot is not perfect, but it's ok
 
@@ -172,13 +173,15 @@ draw(m_cw_tw_2, dist = 1)
 #' chicks with more protein have a steeper growth curve.
 
 #' **break** --------------------------------------------------------------
+rm(m_cw_0, m_cw_1, m_cw_2, m_cw_3, m_cw_4, m_cw_5)
+gc()
 
 #' experimental design and inference
 summary(m_cw_tw_2)
 #' `(Intercept)`: mean across the effects of `time` and `protein_percent`
 #' `s()` terms are the marginal effects, i.e., effects for the variable
 #'   after setting all other variables to the mean effect across the smooth
-#' `ti()` is the change the marginal effect of `time` with `protein_percent`
+#' `ti()` is the change in marginal effect of `time` with `protein_percent`
 #' and vice-versa
 
 summary(m_cw_tw)
@@ -190,13 +193,13 @@ summary(m_cw_tw)
 #'   smoothness parameter for each `diet`; significance indicates
 #'   significant
 #' `s(time,chick)` is the group of `chick`-level random smooths of time;
-#'   significance indicates significant variation across groups. may also
+#'   significance indicates significant variation across chicks. may also
 #'   indicate significant change if a group-level smooth is not included.
 #' *note:* significance is approximate, and p-values are likely too small
 #' because they neglect smoothing parameter uncertainty.
 
 #' *predicting out of sample (random effects)*
-# predict for a chick not in the sample for each diet
+# predict for a chick in the sample for each diet
 # predictions follow the data closely
 chick_weight %>%
   filter(chick == first(chick), .by = 'diet') %>%
@@ -279,6 +282,9 @@ chick_weight_short %>%
 #' experiment (likely due to poor health)
 
 #' **break** --------------------------------------------------------------
+rm(list = ls())
+dev.off()
+gc()
 
 #' *BACI design*:
 #' - Before: start sampling before the treatment for a baseline
@@ -367,11 +373,8 @@ draw(m_dist_re_2, scales = 'fixed')
 summary(m_dist_re_2)
 
 #' use `by` binary variable for explicit contrasts
-z <- d_dist %>%
-  mutate(site = factor(paste(site, disturbed, treated)))
-unique(z$site)
-
 m_dist_fe_2 <- bam(animals_per_km2 ~
+                     site +
                      # random smooths of confounding variables
                      s(forest_perc, site, bs = 'fs') +
                      s(elevation_m, site, bs = 'fs') +
@@ -381,23 +384,23 @@ m_dist_fe_2 <- bam(animals_per_km2 ~
                      s(years, by = disturbed) + # effect of disturbance
                      s(years, by = treated), # effect of treatment
                    family = tw(link = 'log'),
-                   data = z,
-                   # data = d_dist,
+                   data = d_dist,
                    method = 'fREML',
                    discrete = TRUE)
 draw(m_dist_fe_2)
-draw(m_dist_fe_2, select = 3:5) & geom_vline(xintercept = 0, lty='dashed')
+draw(m_dist_fe_2, select = c(3, 5, 6)) &
+  geom_vline(xintercept = 0, lty = 'dashed')
 summary(m_dist_fe_2)
 #' `(Intercept)` is the mean response for the control, averaged across
 #'   the smooth effects of `forest_perc`, `elevation_m`, and `years`
-#' *note:* not across the average `forest_perc`, `elevation_m`, and `years
+#' *note:* not for the average `forest_perc`, `elevation_m`, and `years`
 #' `siteSite 2` is the difference in the intercept and site 2's mean
 #' `siteSite 3` is the difference in the intercept and site 3's mean
 #' `s(forest_perc,site)` is the set of random smooths for `forest_perc`.
 #'   all three smooths have the same smoothness parameter.
 #' `s(elevation_m,site)` is the set of random smooths for `elevation_m`.
 #'   all three smooths have the same smoothness parameter.
-#' `s(years)` is the estimated effect of 
+#' `s(years)` is the estimated effect of time 
 #'  
 #' *note:* significance is approximate, and p-values are likely too small
 #' because they neglect smoothing parameter uncertainty.
