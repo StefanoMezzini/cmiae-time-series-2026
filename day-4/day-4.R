@@ -1,4 +1,5 @@
 #' day 4: *Interpreting nonlinear models*
+#' *note: Posit Cloud RAM is quite limited, so clear plots occasionally*
 #' attach necessary packages
 library('readr')     # for importing tidy csvs
 library('dplyr')     # for data wrangling
