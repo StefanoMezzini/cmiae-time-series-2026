@@ -152,6 +152,9 @@ draw(m_cw_tw)
 appraise(m_cw_tw, point_alpha = 0.3) # QQ plot is not perfect, but it's ok
 
 # we can also use a continuous variable to account for differences in diet
+# takes too long to fit in Posit Cloud
+m_cw_tw_2 <- readRDS(url('https://github.com/StefanoMezzini/cmiae-time-series-2026/raw/refs/heads/main/day-5/m_cw_tw_2.rds'))
+
 m_cw_tw_2 <-
   bam(weight ~
         s(time) +
