@@ -172,7 +172,7 @@ fitted_values(m_lm, data = tibble(time = -5:0))
 m_glm <- gam(formula = weight ~ time,
              family = Gamma(link = 'log'),
              data = chick_weight)
-draw(m_lm, parametric = TRUE) #' *note:* partial effect is on log scale
+draw(m_glm, parametric = TRUE) #' *note:* partial effect is on log scale
 plot_preds(m_glm) #' `eta = log(mu)` implies `mu = exp(eta)`
 
 # values are strictly positive, even a million years before hatching!
