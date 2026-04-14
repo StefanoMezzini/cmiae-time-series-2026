@@ -143,7 +143,7 @@ ggplot(sample_summaries) +
 #' we can check if our data is consistent with a preexisting hypothesis
 #' for example, animals from another population have a known mean of 12 kg.
 #' does this population have a different mean?
-#' if so, we would data to be consistent with this hypothesis
+#' if so, we would expect data to not be consistent with this hypothesis
 #' indicate the null hypothesis as H_0: `mu = mu_0 = 12 kg`
 #' the alternative hypothesis could be H_a: `mu != 12 kg`
 #' *Note:*
