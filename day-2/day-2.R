@@ -33,7 +33,7 @@ ggplot(chick_weight, aes(time, log(weight))) +
   geom_point(alpha = 0.3) +
   geom_smooth(method = 'lm', formula = y ~ x,
               color = 'darkorange', fill = 'darkorange', alpha = 0.3) +
-  labs(x = 'Days since hatching', y = 'Weight (g)')
+  labs(x = 'Days since hatching', y = 'log(Weight)')
 
 # ...actually, it introduces more:
 
